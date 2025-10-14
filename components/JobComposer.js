@@ -7,6 +7,10 @@ import { useComposer } from "@/store/useComposer";
 import { useQueueView } from "@/store/useQueueView";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
+const ordinal = (index) => {
+  const labels = ["1st", "2nd", "3rd"];
+  return labels[index] || `${index + 1}th`;
+};
 
 export default function JobComposer() {
   const type = useComposer((state) => state.type);
@@ -25,6 +29,10 @@ export default function JobComposer() {
   const isSubmitting = useComposer((state) => state.isSubmitting);
   const clearReferences = useComposer((state) => state.clearReferences);
   const submit = useComposer((state) => state.submit);
+  const editingFromJob = useComposer((state) => state.editingFromJob);
+  const clearEditingContext = useComposer(
+    (state) => state.clearEditingContext
+  );
 
   const refreshQueue = useQueueView((state) => state.refresh);
 
@@ -33,13 +41,16 @@ export default function JobComposer() {
   const [loading, setLoading] = useState({ girls: false, library: false });
   const [errors, setErrors] = useState({ girls: "", library: "", submit: "" });
   const [urlInput, setUrlInput] = useState("");
+  const [tempUploading, setTempUploading] = useState(false);
 
   useEffect(() => {
     const loadGirls = async () => {
       setLoading((prev) => ({ ...prev, girls: true }));
       try {
         const res = await fetch("/api/girls");
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
         const data = await res.json();
         setGirls(data.girls ?? []);
         setErrors((prev) => ({ ...prev, girls: "" }));
@@ -61,7 +72,9 @@ export default function JobComposer() {
       setLoading((prev) => ({ ...prev, library: true }));
       try {
         const res = await fetch("/api/library?limit=120");
-        if (!res.ok) throw new Error(await res.text());
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
         const data = await res.json();
         setLibrary(data.images ?? []);
         setErrors((prev) => ({ ...prev, library: "" }));
@@ -84,10 +97,36 @@ export default function JobComposer() {
   );
 
   useEffect(() => {
-    if (selectedGirl?.refImageIds?.length) {
+    if (editingFromJob) return;
+    if (selectedGirl?.refImageIds?.length && type === "generate") {
       setImageIds(selectedGirl.refImageIds);
     }
-  }, [selectedGirl, setImageIds]);
+  }, [selectedGirl, setImageIds, editingFromJob, type]);
+
+  useEffect(() => {
+    if (type !== "edit" && editingFromJob) {
+      clearEditingContext();
+    }
+  }, [type, editingFromJob, clearEditingContext]);
+
+  const orderedRefs = useMemo(() => {
+    const libMap = new Map(library.map((image) => [image.id, image]));
+    const libRefs = imageIds
+      .map((id) => libMap.get(id))
+      .filter(Boolean)
+      .map((image) => ({
+        kind: "library",
+        url: image.publicUrl,
+        id: image.id,
+        filename: image.filename,
+      }));
+    const urlRefs = refUrls.map((url) => ({ kind: "url", url }));
+    return [...libRefs, ...urlRefs];
+  }, [imageIds, library, refUrls]);
+
+  const totalRefs = imageIds.length + refUrls.length;
+  const limitReached = totalRefs >= 3;
+  const libraryLocked = Boolean(editingFromJob) && type === "edit";
 
   const handleAddUrl = () => {
     if (limitReached) return;
@@ -113,14 +152,63 @@ export default function JobComposer() {
     }
   };
 
-  const totalRefs = imageIds.length + refUrls.length;
-  const limitReached = totalRefs >= 3;
+  const onTempFile = async (file) => {
+    if (!file || limitReached) return;
+    setTempUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/upload/temp", {
+        method: "POST",
+        body: fd,
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      const data = await res.json();
+      if (data?.publicUrl) {
+        addRefUrl(data.publicUrl);
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-alert
+      alert(error instanceof Error ? error.message : String(error));
+    } finally {
+      setTempUploading(false);
+    }
+  };
+
+  const applyTemplate = (kind) => {
+    const templates = {
+      leggings: `Replace the leggings from the first image with the leggings from the second image.
+Keep the person's face, body proportions, pose, and background exactly the same.
+Match the fabric folds and lighting so it looks natural.`,
+      object: `Add the object from the second image to the person in the first image.
+Place it naturally. Keep face, hair, pose, outfit, and background unchanged.`,
+      background: `Keep the person from the first image but replace the background with the background from the second image.
+Match lighting and shadows so the subject looks naturally placed.`,
+    };
+    const value = templates[kind];
+    if (value) {
+      setField("prompt", value);
+    }
+  };
 
   return (
     <form
+      id="composer"
       onSubmit={handleSubmit}
       className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
+      {editingFromJob && (
+        <div className="mb-4 rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-sm text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
+          Editing from previous output{" "}
+          <span className="font-mono">
+            {String(editingFromJob).slice(0, 8)}
+          </span>
+          . The first image below is that generated output.
+        </div>
+      )}
+
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold">Job Composer</h2>
@@ -157,6 +245,7 @@ export default function JobComposer() {
             <select
               value={girlId}
               onChange={(event) => setField("girlId", event.target.value)}
+              disabled={Boolean(editingFromJob)}
               className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
             >
               <option value="">None</option>
@@ -195,6 +284,59 @@ export default function JobComposer() {
         <div className="grid gap-2">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              Reference order ({orderedRefs.length}/3)
+            </span>
+            {orderedRefs.length >= 2 && (
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                First image is the base; second image is the donor.
+              </span>
+            )}
+          </div>
+
+          {orderedRefs.length === 0 ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+              Select library images and/or add URLs. For editing a previous
+              output, click Edit This in the job list.
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
+              {orderedRefs.map((ref, index) => (
+                <div
+                  key={`${ref.url}-${index}`}
+                  className="relative overflow-hidden rounded-xl border shadow-sm dark:border-slate-700"
+                >
+                  <Image
+                    src={ref.url}
+                    alt={`reference ${index + 1}`}
+                    width={220}
+                    height={220}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute left-2 top-2 flex items-center gap-2">
+                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase text-white dark:bg-slate-100 dark:text-slate-900">
+                      {ordinal(index)}{" "}
+                      {index === 0 ? "(first)" : index === 1 ? "(second)" : ""}
+                    </span>
+                    {ref.kind === "url" && (
+                      <span className="rounded-full bg-indigo-600/90 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
+                        URL
+                      </span>
+                    )}
+                    {ref.kind === "library" && (
+                      <span className="rounded-full bg-emerald-600/90 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
+                        Library
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Library references ({imageIds.length}/3)
             </span>
             <div className="flex items-center gap-3 text-xs">
@@ -208,7 +350,12 @@ export default function JobComposer() {
               )}
             </div>
           </div>
-          {errors.library ? (
+
+          {libraryLocked ? (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
+              Library references are disabled while editing a previous output. Use the one-time upload below for donor images.
+            </div>
+          ) : errors.library ? (
             <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
               {errors.library}
             </div>
@@ -220,19 +367,25 @@ export default function JobComposer() {
             <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
               {library.map((image) => {
                 const isSelected = imageIds.includes(image.id);
+                const orderIndex = isSelected
+                  ? imageIds.indexOf(image.id)
+                  : null;
                 return (
                   <button
                     key={image.id}
                     type="button"
-                    onClick={() => toggleImageId(image.id)}
-                    disabled={limitReached && !isSelected}
+                    onClick={() => {
+                      if (libraryLocked) return;
+                      toggleImageId(image.id);
+                    }}
+                    disabled={(limitReached && !isSelected) || libraryLocked}
                     className={cn(
                       "group relative overflow-hidden rounded-xl border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-500",
                       isSelected
                         ? "border-slate-900 ring-2 ring-slate-400 dark:border-slate-100 dark:ring-slate-600"
                         : limitReached
                         ? "border-transparent opacity-40"
-                        : "border-transparent hover:translate-y-[-1px]"
+                        : "border-transparent hover:-translate-y-px"
                     )}
                   >
                     <Image
@@ -250,7 +403,11 @@ export default function JobComposer() {
                           : "bg-white/80 text-slate-600 backdrop-blur dark:bg-slate-900/80 dark:text-slate-200"
                       )}
                     >
-                      {isSelected ? "Selected" : "Tap"}
+                      {isSelected
+                        ? ordinal(orderIndex)
+                        : limitReached
+                        ? "Max"
+                        : "Tap"}
                     </span>
                   </button>
                 );
@@ -260,15 +417,25 @@ export default function JobComposer() {
         </div>
 
         <div className="grid gap-2">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-            External reference URLs ({refUrls.length}/3)
-          </label>
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              External/temporary URLs ({refUrls.length}/3)
+            </label>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              One-time images upload below; they will not persist in the
+              library.
+            </div>
+          </div>
+
           <div className="flex flex-wrap items-center gap-2">
-            {refUrls.map((url) => (
+            {refUrls.map((url, index) => (
               <span
                 key={url}
                 className="group inline-flex items-center gap-2 rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-800 dark:bg-slate-700 dark:text-slate-100"
               >
+                <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white dark:bg-slate-100 dark:text-slate-900">
+                  {ordinal(imageIds.length + index)}
+                </span>
                 <a
                   href={url}
                   target="_blank"
@@ -286,7 +453,8 @@ export default function JobComposer() {
                 </button>
               </span>
             ))}
-            {refUrls.length < 3 && (
+
+            {totalRefs < 3 && (
               <div className="flex items-center gap-2 rounded-full border border-dashed border-slate-300 bg-white px-3 py-1 text-xs dark:border-slate-700 dark:bg-slate-950">
                 <input
                   type="url"
@@ -305,27 +473,75 @@ export default function JobComposer() {
                   type="button"
                   onClick={handleAddUrl}
                   className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-                  disabled={!urlInput.trim() || limitReached}
+                  disabled={!urlInput.trim()}
                 >
                   Add
                 </button>
               </div>
             )}
           </div>
+
+          {totalRefs < 3 && (
+            <div className="mt-2 flex items-center gap-3">
+              <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+                <span className="rounded bg-slate-100 px-2 py-1 dark:bg-slate-800">
+                  One-time image:
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    onTempFile(file);
+                    event.target.value = "";
+                  }}
+                  disabled={tempUploading}
+                  className="text-xs"
+                />
+              </label>
+              {tempUploading && (
+                <span className="text-xs text-slate-500">Uploading…</span>
+              )}
+            </div>
+          )}
         </div>
 
-        <label className="grid gap-2 text-sm">
-          <span className="font-medium text-slate-700 dark:text-slate-200">
-            Prompt
-          </span>
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Prompt templates
+            </span>
+            <button
+              type="button"
+              onClick={() => applyTemplate("leggings")}
+              className="rounded-full border border-slate-300 px-2 py-0.5 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              Replace leggings
+            </button>
+            <button
+              type="button"
+              onClick={() => applyTemplate("object")}
+              className="rounded-full border border-slate-300 px-2 py-0.5 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              Add object
+            </button>
+            <button
+              type="button"
+              onClick={() => applyTemplate("background")}
+              className="rounded-full border border-slate-300 px-2 py-0.5 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+            >
+              Replace background
+            </button>
+          </div>
+
           <textarea
             value={prompt}
             onChange={(event) => setField("prompt", event.target.value)}
             rows={6}
-            placeholder="Describe the scene, clothing, lighting, and identity constraints."
+            placeholder="Describe the edit. Example: Replace the leggings from the first image with the leggings from the second image. Keep the same face and pose. Do not change aspect ratio."
             className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
           />
-        </label>
+        </div>
 
         <div className="flex flex-wrap gap-4 text-sm">
           <label className="flex items-center gap-2 font-medium text-slate-700 dark:text-slate-200">
@@ -357,8 +573,8 @@ export default function JobComposer() {
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800">
         <span className="text-slate-500 dark:text-slate-400">
-          {totalRefs} references selected · {type === "edit" ? "Edit" : "Generate"}{" "}
-          job
+          {orderedRefs.length} references selected ·{" "}
+          {type === "edit" ? "Edit" : "Generate"} job
         </span>
         <div className="flex gap-2">
           <button
@@ -367,6 +583,7 @@ export default function JobComposer() {
               setField("prompt", "");
               setField("girlId", "");
               clearReferences();
+              clearEditingContext();
             }}
             className="rounded-full border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >

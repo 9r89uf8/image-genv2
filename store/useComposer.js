@@ -13,6 +13,9 @@ const defaultState = {
   imageOnly: false,
   chatMode: false,
   isSubmitting: false,
+
+  // Track when composer is prefilled from an existing job result.
+  editingFromJob: null,
 };
 
 export const useComposer = create((set, get) => ({
@@ -35,6 +38,7 @@ export const useComposer = create((set, get) => ({
     }
   },
   addRefUrl: (url) => {
+    if (!url) return;
     const { refUrls, imageIds } = get();
     if (refUrls.includes(url)) return;
     if (refUrls.length + imageIds.length >= 3) return;
@@ -49,6 +53,25 @@ export const useComposer = create((set, get) => ({
     set({ refUrls: unique.slice(0, maxUrls) });
   },
   clearReferences: () => set({ imageIds: [], refUrls: [] }),
+
+  loadJobForEditing: (job) => {
+    const firstUrl = job?.result?.publicUrl || "";
+    const aspectRatio = job?.inputs?.aspectRatio || ASPECT_RATIOS[0];
+    set({
+      type: "edit",
+      girlId: job?.girlId || "",
+      imageIds: [],
+      refUrls: firstUrl ? [firstUrl] : [],
+      prompt: "",
+      aspectRatio,
+      imageOnly: false,
+      chatMode: false,
+      editingFromJob: job?.id || "prefilled",
+    });
+  },
+
+  clearEditingContext: () => set({ editingFromJob: null }),
+
   reset: () => set({ ...defaultState }),
   submit: async () => {
     const state = get();

@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useComposer } from "@/store/useComposer";
 import { useQueueView } from "@/store/useQueueView";
 
 const statusStyles = {
@@ -27,6 +29,8 @@ const formatCost = (cost) => {
 };
 
 export default function JobQueueList() {
+  const router = useRouter();
+  const loadJobForEditing = useComposer((state) => state.loadJobForEditing);
   const jobs = useQueueView((state) => state.jobs);
   const isLoading = useQueueView((state) => state.isLoading);
   const error = useQueueView((state) => state.error);
@@ -158,6 +162,18 @@ export default function JobQueueList() {
                     {job.inputs?.imageOnly ? "Yes" : "No"}
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
+                    {job.status === "SUCCEEDED" && job.result?.publicUrl && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          loadJobForEditing(job);
+                          router.push("/#composer");
+                        }}
+                        className="rounded-full border border-indigo-500 px-3 py-1.5 text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:border-indigo-400/60 dark:text-indigo-300 dark:hover:bg-indigo-400/10"
+                      >
+                        Edit This
+                      </button>
+                    )}
                     {canCancel && (
                       <button
                         type="button"
