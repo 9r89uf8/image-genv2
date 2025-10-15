@@ -240,7 +240,7 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
                   )}
 
                   {turn.attachments?.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {turn.attachments.map((attachment, index) => {
                         const displayUrl =
                           attachment.previewUrl || attachment.url;
@@ -251,14 +251,14 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
                             href={displayUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="block overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                            className="block w-full max-w-[200px] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
                           >
                             <Image
                               src={displayUrl}
                               alt="attachment"
                               width={600}
                               height={600}
-                              className="w-full rounded-lg object-contain"
+                              className="h-auto w-full rounded-lg object-contain"
                               style={{ height: "auto" }}
                             />
                           </a>
@@ -282,21 +282,21 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
                   )}
 
                   {turn.images?.length > 0 && (
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {turn.images.map((image, index) => (
                         <a
                           key={`${image.publicUrl}-${index}`}
                           href={image.publicUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="relative block overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
+                          className="relative block w-full max-w-[220px] overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700"
                         >
                           <Image
                             src={image.publicUrl}
                             alt="model output"
                             width={1024}
                             height={1024}
-                            className="w-full rounded-lg object-contain"
+                            className="h-auto w-full rounded-lg object-contain"
                             style={{ height: "auto" }}
                           />
                           <span className="absolute inset-x-2 bottom-2 rounded bg-white/80 px-2 py-0.5 text-[10px] font-semibold backdrop-blur dark:bg-slate-900/80">
