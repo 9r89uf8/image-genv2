@@ -384,31 +384,11 @@ Match lighting and shadows so the subject looks naturally placed.`,
         </div>
       )}
 
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold">Job Composer</h2>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Assemble prompt, references, and options. Max three references per
-            job.
-          </p>
-        </div>
-        <div className="flex rounded-full border border-slate-200 bg-slate-100 p-1 text-xs font-semibold dark:border-slate-700 dark:bg-slate-800">
-          {["generate", "edit"].map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setField("type", value)}
-              className={cn(
-                "rounded-full px-3 py-1 transition",
-                type === value
-                  ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                  : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
-              )}
-            >
-              {value === "generate" ? "Generate" : "Edit"}
-            </button>
-          ))}
-        </div>
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold">Job Composer</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          Assemble prompt, references, and options. Max three references per job.
+        </p>
       </div>
 
       <div className="grid gap-6">
@@ -744,6 +724,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
             onClick={() => {
               setField("prompt", "");
               setField("girlId", "");
+              setField("type", "generate");
               clearReferences();
               clearEditingContext();
             }}
