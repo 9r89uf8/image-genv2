@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useComposer } from "@/store/useComposer";
@@ -40,12 +40,94 @@ export default function JobQueueList() {
   const cancelJob = useQueueView((state) => state.cancelJob);
   const deleteJob = useQueueView((state) => state.deleteJob);
   const rerunJob = useQueueView((state) => state.rerunJob);
+  const [girls, setGirls] = useState([]);
+  const [selectedGirlId, setSelectedGirlId] = useState("");
+  const [girlsError, setGirlsError] = useState("");
+  const [isGirlsLoading, setIsGirlsLoading] = useState(false);
 
   useEffect(() => {
     startPolling();
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadGirls = async () => {
+      setIsGirlsLoading(true);
+      try {
+        const res = await fetch("/api/girls");
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data = await res.json();
+        if (!isMounted) return;
+        setGirls(Array.isArray(data.girls) ? data.girls : []);
+        setGirlsError("");
+      } catch (err) {
+        if (!isMounted) return;
+        const message =
+          err instanceof Error ? err.message : "Unable to load girls.";
+        setGirlsError(message);
+      } finally {
+        if (isMounted) {
+          setIsGirlsLoading(false);
+        }
+      }
+    };
+
+    loadGirls();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const girlOptions = useMemo(() => {
+    const sortedGirls = [...girls].sort((a, b) => {
+      const nameA = (a?.name || "").toLowerCase();
+      const nameB = (b?.name || "").toLowerCase();
+      if (nameA < nameB) return -1;
+      if (nameA > nameB) return 1;
+      return 0;
+    });
+
+    const options = [
+      { value: "", label: "All girls" },
+      ...sortedGirls.map((girl) => ({
+        value: girl.id ?? "",
+        label: girl.name?.trim() || "Untitled",
+      })),
+    ];
+
+    if (
+      selectedGirlId &&
+      !options.some((option) => option.value === selectedGirlId)
+    ) {
+      options.push({ value: selectedGirlId, label: "Unknown girl" });
+    }
+
+    return options;
+  }, [girls, selectedGirlId]);
+
+  const girlNameById = useMemo(() => {
+    return girls.reduce((acc, girl) => {
+      if (!girl?.id) {
+        return acc;
+      }
+      const trimmed = typeof girl.name === "string" ? girl.name.trim() : "";
+      acc[girl.id] = trimmed.length > 0 ? trimmed : "Untitled";
+      return acc;
+    }, {});
+  }, [girls]);
+
+  const filteredJobs = useMemo(() => {
+    if (!selectedGirlId) return jobs;
+    return jobs.filter((job) => job?.girlId === selectedGirlId);
+  }, [jobs, selectedGirlId]);
+
+  const hasFilterApplied = Boolean(selectedGirlId);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -56,14 +138,46 @@ export default function JobQueueList() {
             Live view of pending, running, and completed generations.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={refresh}
-          disabled={isLoading}
-          className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-        >
-          Refresh
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col text-left">
+            <label
+              htmlFor="job-queue-girl-filter"
+              className="text-xs font-semibold uppercase text-slate-500 dark:text-slate-400"
+            >
+              Filter by girl
+            </label>
+            <select
+              id="job-queue-girl-filter"
+              value={selectedGirlId}
+              onChange={(event) => setSelectedGirlId(event.target.value)}
+              className="mt-1 min-w-[160px] rounded-full border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500"
+              disabled={isGirlsLoading && girlOptions.length <= 1}
+            >
+              {isGirlsLoading && girlOptions.length <= 1 ? (
+                <option value="">Loading girls…</option>
+              ) : (
+                girlOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))
+              )}
+            </select>
+            {girlsError && (
+              <span className="mt-1 text-xs text-rose-500 dark:text-rose-300">
+                {girlsError}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={refresh}
+            disabled={isLoading}
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -72,15 +186,17 @@ export default function JobQueueList() {
         </div>
       )}
 
-      {jobs.length === 0 ? (
+      {filteredJobs.length === 0 ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
           {isLoading
             ? "Loading jobs…"
+            : hasFilterApplied
+            ? "No jobs found for this girl yet."
             : "No jobs yet. Compose one from the panel above."}
         </div>
       ) : (
         <div className="grid gap-4">
-          {jobs.map((job) => {
+          {filteredJobs.map((job) => {
             const statusStyle = statusStyles[job.status] ?? statusStyles.PENDING;
             const canCancel = ["PENDING", "RUNNING"].includes(job.status);
             const canRerun = ["SUCCEEDED", "FAILED"].includes(job.status);
@@ -100,6 +216,11 @@ export default function JobQueueList() {
                     >
                       {job.status}
                     </span>
+                    {job.girlId && (
+                      <span className="rounded-full border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                        {girlNameById[job.girlId] ?? "Unknown girl"}
+                      </span>
+                    )}
                     <span className="text-slate-500 dark:text-slate-400">
                       {job.type === "edit" ? "Edit" : "Generate"} · ID {job.id}
                     </span>

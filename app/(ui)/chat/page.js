@@ -10,6 +10,10 @@ export default function ChatPage() {
   const [activeSession, setActiveSession] = useState("");
   const [loading, setLoading] = useState(false);
   const pendingSessionRef = useRef(null);
+  const [girls, setGirls] = useState([]);
+  const [selectedGirlId, setSelectedGirlId] = useState("");
+  const [isGirlsLoading, setIsGirlsLoading] = useState(false);
+  const [girlsError, setGirlsError] = useState("");
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,6 +45,39 @@ export default function ChatPage() {
     fetchSessions();
   }, [fetchSessions]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadGirls = async () => {
+      setIsGirlsLoading(true);
+      try {
+        const res = await fetch("/api/girls");
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data = await res.json();
+        if (!isMounted) return;
+        setGirls(Array.isArray(data.girls) ? data.girls : []);
+        setGirlsError("");
+      } catch (error) {
+        if (!isMounted) return;
+        const message =
+          error instanceof Error ? error.message : "Unable to load girls.";
+        setGirlsError(message);
+      } finally {
+        if (isMounted) {
+          setIsGirlsLoading(false);
+        }
+      }
+    };
+
+    loadGirls();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const searchParamsString = useMemo(() => {
     return searchParams?.toString() ?? "";
   }, [searchParams]);
@@ -50,28 +87,71 @@ export default function ChatPage() {
     return params.get("session") || "";
   }, [searchParamsString]);
 
+  const girlOptions = useMemo(() => {
+    const sorted = [...girls].sort((a, b) => {
+      const nameA = (a?.name || "").toLowerCase();
+      const nameB = (b?.name || "").toLowerCase();
+      if (nameA < nameB) return -1;
+      if (nameA > nameB) return 1;
+      return 0;
+    });
+
+    const options = [
+      { value: "", label: "All girls" },
+      ...sorted.map((girl) => ({
+        value: girl.id ?? "",
+        label: girl.name?.trim() || "Untitled",
+      })),
+    ];
+
+    if (
+      selectedGirlId &&
+      !options.some((option) => option.value === selectedGirlId)
+    ) {
+      options.push({ value: selectedGirlId, label: "Unknown girl" });
+    }
+
+    return options;
+  }, [girls, selectedGirlId]);
+
+  const girlNameById = useMemo(() => {
+    return girls.reduce((acc, girl) => {
+      if (!girl?.id) {
+        return acc;
+      }
+      const trimmed = typeof girl.name === "string" ? girl.name.trim() : "";
+      acc[girl.id] = trimmed.length > 0 ? trimmed : "Untitled";
+      return acc;
+    }, {});
+  }, [girls]);
+
+  const filteredSessions = useMemo(() => {
+    if (!selectedGirlId) return sessions;
+    return sessions.filter((session) => session.girlId === selectedGirlId);
+  }, [sessions, selectedGirlId]);
+
+  const hasFilterApplied = Boolean(selectedGirlId);
+
   useEffect(() => {
-    if (!sessions.length) {
+    if (!filteredSessions.length) {
       setActiveSession("");
       pendingSessionRef.current = null;
       return;
     }
 
     const pendingId = pendingSessionRef.current;
-    if (pendingId && sessions.some((session) => session.id === pendingId)) {
+    if (pendingId && filteredSessions.some((session) => session.id === pendingId)) {
       if (querySessionId === pendingId) {
         pendingSessionRef.current = null;
-      } else {
-        if (activeSession !== pendingId) {
-          setActiveSession(pendingId);
-        }
+      } else if (activeSession !== pendingId) {
+        setActiveSession(pendingId);
         return;
       }
     }
 
     if (
       querySessionId &&
-      sessions.some((session) => session.id === querySessionId)
+      filteredSessions.some((session) => session.id === querySessionId)
     ) {
       if (activeSession !== querySessionId) {
         setActiveSession(querySessionId);
@@ -79,13 +159,16 @@ export default function ChatPage() {
       return;
     }
 
-    if (activeSession && sessions.some((session) => session.id === activeSession)) {
+    if (
+      activeSession &&
+      filteredSessions.some((session) => session.id === activeSession)
+    ) {
       return;
     }
 
-    setActiveSession(sessions[0]?.id || "");
+    setActiveSession(filteredSessions[0]?.id || "");
     pendingSessionRef.current = null;
-  }, [activeSession, sessions, querySessionId]);
+  }, [activeSession, filteredSessions, querySessionId]);
 
   useEffect(() => {
     if (
@@ -118,6 +201,7 @@ export default function ChatPage() {
         body: JSON.stringify({
           title: "New chat",
           aspectRatio: DEFAULT_ASPECT_RATIO,
+          girlId: selectedGirlId || "",
         }),
       });
       if (!res.ok) {
@@ -131,7 +215,7 @@ export default function ChatPage() {
       console.error("Failed to create chat session", error);
       alert("Failed to create chat session.");
     }
-  }, [fetchSessions]);
+  }, [fetchSessions, selectedGirlId]);
 
   const deleteSession = useCallback(
     async (id) => {
@@ -176,15 +260,48 @@ export default function ChatPage() {
           </button>
         </div>
 
+        <div className="mb-4">
+          <label
+            htmlFor="chat-girl-filter"
+            className="text-[11px] font-semibold uppercase text-slate-500 dark:text-slate-400"
+          >
+            Filter by girl
+          </label>
+          <select
+            id="chat-girl-filter"
+            value={selectedGirlId}
+            onChange={(event) => setSelectedGirlId(event.target.value)}
+            className="mt-1 w-full rounded-full border border-slate-300 px-3 py-1.5 text-sm text-slate-700 transition hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-slate-500"
+            disabled={isGirlsLoading && girlOptions.length <= 1}
+          >
+            {isGirlsLoading && girlOptions.length <= 1 ? (
+              <option value="">Loading girls…</option>
+            ) : (
+              girlOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))
+            )}
+          </select>
+          {girlsError && (
+            <span className="mt-1 block text-xs text-rose-500 dark:text-rose-300">
+              {girlsError}
+            </span>
+          )}
+        </div>
+
         {loading && sessions.length === 0 ? (
           <p className="px-3 py-6 text-xs text-slate-500">Loading sessions…</p>
-        ) : sessions.length === 0 ? (
+        ) : filteredSessions.length === 0 ? (
           <p className="px-3 py-6 text-xs text-slate-500">
-            No chat sessions yet. Create one to get started.
+            {hasFilterApplied
+              ? "No sessions found for this girl yet."
+              : "No chat sessions yet. Create one to get started."}
           </p>
         ) : (
           <div className="grid gap-1">
-            {sessions.map((session) => {
+            {filteredSessions.map((session) => {
               const isActive = session.id === activeSession;
               return (
                 <button
@@ -200,6 +317,11 @@ export default function ChatPage() {
                   <div className="font-medium">
                     {session.title || "Untitled"}
                   </div>
+                  {session.girlId && (
+                    <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      {girlNameById[session.girlId] ?? "Unknown girl"}
+                    </div>
+                  )}
                   <div className="text-xs text-slate-500">
                     {session.aspectRatio} ·{" "}
                     {session.lastActive
