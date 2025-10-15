@@ -12,6 +12,82 @@ const ordinal = (index) => {
   return labels[index] || `${index + 1}th`;
 };
 
+const getUrlMeta = (url) => {
+  try {
+    const parsed = new URL(url);
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const rawName = segments[segments.length - 1] || parsed.hostname || url;
+    let displayName = rawName;
+    try {
+      displayName = decodeURIComponent(rawName);
+    } catch {
+      displayName = rawName;
+    }
+    return {
+      displayName,
+      hostname: parsed.hostname || "",
+    };
+  } catch {
+    return {
+      displayName: url,
+      hostname: "",
+    };
+  }
+};
+
+function RefUrlPreview({ url, orderLabel, onRemove }) {
+  const [failed, setFailed] = useState(false);
+  const { displayName, hostname } = useMemo(() => getUrlMeta(url), [url]);
+
+  return (
+    <div className="group relative flex w-full max-w-[220px] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-900">
+      <div className="flex items-center justify-between">
+        <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white dark:bg-slate-100 dark:text-slate-900">
+          {orderLabel}
+        </span>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-full bg-slate-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 transition hover:bg-slate-400 dark:bg-slate-600 dark:text-slate-200 dark:hover:bg-slate-500"
+        >
+          Remove
+        </button>
+      </div>
+      <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
+        {failed ? (
+          <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-slate-500 dark:text-slate-400">
+            Preview unavailable
+          </div>
+        ) : (
+          // Use plain img to avoid domain restrictions from next/image.
+          <img
+            src={url}
+            alt={`Reference ${orderLabel}`}
+            className="h-full w-full object-cover"
+            onError={() => setFailed(true)}
+            draggable={false}
+          />
+        )}
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="truncate font-medium text-slate-700 underline decoration-dotted underline-offset-2 dark:text-slate-200"
+        >
+          {displayName}
+        </a>
+        {hostname && (
+          <span className="truncate text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            {hostname}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function JobComposer() {
   const type = useComposer((state) => state.type);
   const setField = useComposer((state) => state.setField);
@@ -530,31 +606,14 @@ Match lighting and shadows so the subject looks naturally placed.`,
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-3">
             {refUrls.map((url, index) => (
-              <span
+              <RefUrlPreview
                 key={url}
-                className="group inline-flex items-center gap-2 rounded-full bg-slate-200 px-3 py-1 text-xs font-medium text-slate-800 dark:bg-slate-700 dark:text-slate-100"
-              >
-                <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[10px] font-semibold text-white dark:bg-slate-100 dark:text-slate-900">
-                  {ordinal(imageIds.length + index)}
-                </span>
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="max-w-[160px] truncate underline decoration-dotted underline-offset-2"
-                >
-                  {url}
-                </a>
-                <button
-                  type="button"
-                  onClick={() => removeRefUrl(url)}
-                  className="rounded-full bg-slate-300 px-1 text-[10px] uppercase tracking-wide text-slate-700 transition hover:bg-slate-400 dark:bg-slate-600 dark:text-slate-200 dark:hover:bg-slate-500"
-                >
-                  ×
-                </button>
-              </span>
+                url={url}
+                orderLabel={ordinal(imageIds.length + index)}
+                onRemove={() => removeRefUrl(url)}
+              />
             ))}
 
             {totalRefs < 3 && (
