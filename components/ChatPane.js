@@ -31,8 +31,29 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
         throw new Error(await res.text());
       }
       const data = await res.json();
-      setSession(data.session);
-      setTurns(data.turns || []);
+      const sanitizedSession = data.session
+        ? {
+            ...data.session,
+            totalCostUsd: Number(data.session.totalCostUsd ?? 0),
+            totalTokens: Number(data.session.totalTokens ?? 0),
+            totalImages: Number(data.session.totalImages ?? 0),
+          }
+        : null;
+      setSession(sanitizedSession);
+      const sanitizedTurns = (data.turns || []).map((turn) => ({
+        ...turn,
+        costUsd: Number(turn.costUsd ?? 0),
+        usage: turn.usage
+          ? {
+              ...turn.usage,
+              imagesOut: Number(turn.usage.imagesOut ?? 0),
+              inputTokens: Number(turn.usage.inputTokens ?? 0),
+              outputTokens: Number(turn.usage.outputTokens ?? 0),
+              totalTokens: Number(turn.usage.totalTokens ?? 0),
+            }
+          : null,
+      }));
+      setTurns(sanitizedTurns);
       scrollToBottom();
     } catch (error) {
       console.error("Failed to load chat session", error);
@@ -106,7 +127,7 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      const { turn } = await res.json();
+      const { turn, sessionTotals } = await res.json();
 
       const timestamp = new Date().toISOString();
       const userTurn = {
@@ -121,13 +142,31 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
       };
       const modelTurn = {
         id: turn.id,
-        role: "model",
+        role: turn.role || "model",
         text: turn.text,
-        images: turn.images,
+        images: turn.images || [],
+        costUsd: Number(turn.costUsd ?? 0),
+        usage: turn.usage || null,
         createdAt: timestamp,
       };
 
       setTurns((prev) => [...prev, userTurn, modelTurn]);
+      if (sessionTotals) {
+        setSession((prev) =>
+          prev
+            ? {
+                ...prev,
+                totalCostUsd: Number(
+                  sessionTotals.totalCostUsd ?? prev.totalCostUsd ?? 0
+                ),
+                totalTokens:
+                  Number(sessionTotals.totalTokens ?? prev.totalTokens ?? 0),
+                totalImages:
+                  Number(sessionTotals.totalImages ?? prev.totalImages ?? 0),
+              }
+            : prev
+        );
+      }
       setMessage("");
       setAttachments([]);
       scrollToBottom();
@@ -157,6 +196,11 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
           </h2>
           <p className="text-xs text-slate-500">
             Aspect ratio: {session?.aspectRatio || DEFAULT_ASPECT_RATIO}
+          </p>
+          <p className="text-xs text-slate-500">
+            Total cost: $
+            {(Number(session?.totalCostUsd ?? 0) || 0).toFixed(4)} · Tokens:{" "}
+            {Number(session?.totalTokens ?? 0) || 0}
           </p>
         </div>
         <button
@@ -212,13 +256,28 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
                             <Image
                               src={displayUrl}
                               alt="attachment"
-                              width={300}
-                              height={300}
-                              className="h-32 w-full object-cover"
+                              width={600}
+                              height={600}
+                              className="w-full rounded-lg object-contain"
+                              style={{ height: "auto" }}
                             />
                           </a>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {!isUser && (turn.costUsd || turn.usage) && (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-medium text-slate-500">
+                      {typeof turn.costUsd === "number" && turn.costUsd > 0 && (
+                        <span>Cost ${turn.costUsd.toFixed(4)}</span>
+                      )}
+                      {turn.usage?.totalTokens ? (
+                        <span>{turn.usage.totalTokens} tokens</span>
+                      ) : null}
+                      {turn.usage?.imagesOut ? (
+                        <span>{turn.usage.imagesOut} image(s)</span>
+                      ) : null}
                     </div>
                   )}
 
@@ -235,9 +294,10 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
                           <Image
                             src={image.publicUrl}
                             alt="model output"
-                            width={300}
-                            height={300}
-                            className="h-40 w-full object-cover"
+                            width={1024}
+                            height={1024}
+                            className="w-full rounded-lg object-contain"
+                            style={{ height: "auto" }}
                           />
                           <span className="absolute inset-x-2 bottom-2 rounded bg-white/80 px-2 py-0.5 text-[10px] font-semibold backdrop-blur dark:bg-slate-900/80">
                             Open

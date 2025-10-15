@@ -71,6 +71,15 @@ export async function GET(_request, context) {
       attachments,
       images: data.images || [],
       createdAt: serializeTimestamp(data.createdAt),
+      costUsd: Number(data.costUsd ?? 0),
+      usage: data.usage
+        ? {
+            imagesOut: Number(data.usage.imagesOut ?? 0),
+            inputTokens: Number(data.usage.inputTokens ?? 0),
+            outputTokens: Number(data.usage.outputTokens ?? 0),
+            totalTokens: Number(data.usage.totalTokens ?? 0),
+          }
+        : null,
     });
   }
 
@@ -85,6 +94,9 @@ export async function GET(_request, context) {
       systemPrompt: session.systemPrompt || "",
       createdAt: serializeTimestamp(session.createdAt),
       lastActive: serializeTimestamp(session.lastActive),
+      totalCostUsd: Number(session.totalCostUsd ?? 0),
+      totalTokens: Number(session.totalTokens ?? 0),
+      totalImages: Number(session.totalImages ?? 0),
     },
     turns,
   });

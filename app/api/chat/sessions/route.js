@@ -23,6 +23,9 @@ export async function GET() {
       girlId: data.girlId || "",
       aspectRatio: data.aspectRatio || DEFAULT_ASPECT_RATIO,
       systemPrompt: data.systemPrompt || "",
+      totalCostUsd: Number(data.totalCostUsd ?? 0),
+      totalTokens: Number(data.totalTokens ?? 0),
+      totalImages: Number(data.totalImages ?? 0),
       createdAt: serializeTimestamp(data.createdAt),
       lastActive: serializeTimestamp(data.lastActive),
     };
@@ -50,6 +53,9 @@ export async function POST(request) {
     systemPrompt,
     createdAt: now,
     lastActive: now,
+    totalCostUsd: 0,
+    totalTokens: 0,
+    totalImages: 0,
   });
 
   return Response.json({ id: ref.id });

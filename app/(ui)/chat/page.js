@@ -22,7 +22,14 @@ export default function ChatPage() {
         throw new Error(await res.text());
       }
       const data = await res.json();
-      setSessions(data.sessions || []);
+      const sanitized =
+        data.sessions?.map((session) => ({
+          ...session,
+          totalCostUsd: Number(session.totalCostUsd ?? 0),
+          totalTokens: Number(session.totalTokens ?? 0),
+          totalImages: Number(session.totalImages ?? 0),
+        })) ?? [];
+      setSessions(sanitized);
     } catch (error) {
       console.error("Failed to load sessions", error);
     } finally {
@@ -198,6 +205,10 @@ export default function ChatPage() {
                     {session.lastActive
                       ? new Date(session.lastActive).toLocaleString()
                       : "no activity"}
+                  </div>
+                  <div className="text-xs text-slate-500">
+                    Cost ${session.totalCostUsd.toFixed(4)} · Tokens{" "}
+                    {session.totalTokens}
                   </div>
                 </button>
               );

@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-import { db, Timestamp } from "@/lib/firebase-admin";
+import { db, FieldValue, Timestamp } from "@/lib/firebase-admin";
 import {
   ensureFileUriForLibraryImage,
   ensureFileUriFromUrl,
@@ -11,7 +11,12 @@ import {
   createChat,
   saveChatImageBuffer,
 } from "@/lib/chat";
-import { DEFAULT_ASPECT_RATIO, FILE_URI_TTL_MS } from "@/lib/constants";
+import {
+  DEFAULT_ASPECT_RATIO,
+  FILE_URI_TTL_MS,
+  TOKENS_PER_IMAGE,
+} from "@/lib/constants";
+import { estimateCostUsd } from "@/lib/costs";
 import { Modality } from "@google/genai";
 
 function isNonEmptyArray(value) {
@@ -177,17 +182,65 @@ export async function POST(request, context) {
     savedImages.push(saved);
   }
 
+  const usageMeta =
+    response?.usageMetadata ||
+    response?.candidates?.[0]?.usageMetadata ||
+    {};
+  const inputTokens =
+    Number(usageMeta.inputTokenCount ?? usageMeta.promptTokenCount ?? 0) || 0;
+  const outputTokens =
+    Number(usageMeta.outputTokenCount ?? usageMeta.candidatesTokenCount ?? 0) ||
+    0;
+  const totalTokensRaw =
+    Number(
+      usageMeta.totalTokenCount ??
+        usageMeta.tokenCount ??
+        inputTokens + outputTokens
+    ) || inputTokens + outputTokens;
+  const imagesOut = savedImages.length;
+  const fallbackTokens = imagesOut * TOKENS_PER_IMAGE;
+  const totalTokens = totalTokensRaw || fallbackTokens;
+
+  const usage = {
+    imagesOut,
+    inputTokens,
+    outputTokens,
+    totalTokens,
+  };
+
+  const costUsd = estimateCostUsd({
+    imagesOut,
+    totalTokens,
+    outputTokens,
+  });
+  const costIncrement = Number.isFinite(costUsd) ? costUsd : 0;
+  const tokenIncrement = Number.isFinite(totalTokens) ? totalTokens : 0;
+  const imageIncrement = imagesOut;
+
   await modelTurnRef.set({
     role: "model",
     text: modelText,
     images: savedImages,
+    usage,
+    costUsd,
     createdAt: Timestamp.now(),
   });
 
   await sessionRef.update({
     lastActive: Timestamp.now(),
     aspectRatio: aspect,
+    totalCostUsd: FieldValue.increment(costIncrement),
+    totalTokens: FieldValue.increment(tokenIncrement),
+    totalImages: FieldValue.increment(imageIncrement),
   });
+
+  const sessionTotals = {
+    totalCostUsd: Number(
+      ((Number(session.totalCostUsd ?? 0) || 0) + costIncrement).toFixed(4)
+    ),
+    totalTokens: Number(session.totalTokens ?? 0) + tokenIncrement,
+    totalImages: Number(session.totalImages ?? 0) + imageIncrement,
+  };
 
   return Response.json({
     turn: {
@@ -195,6 +248,9 @@ export async function POST(request, context) {
       role: "model",
       text: modelText,
       images: savedImages,
+      usage,
+      costUsd,
     },
+    sessionTotals,
   });
 }
