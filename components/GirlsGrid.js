@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useComposer } from "@/store/useComposer";
+import UploadButton from "@/components/UploadButton";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -11,6 +12,7 @@ const emptyGirl = { name: "", notes: "" };
 export default function GirlsGrid() {
   const [girls, setGirls] = useState([]);
   const [library, setLibrary] = useState([]);
+  const [ownedLibrary, setOwnedLibrary] = useState([]);
   const [selectedGirlId, setSelectedGirlId] = useState("");
   const [createForm, setCreateForm] = useState(emptyGirl);
   const [editForm, setEditForm] = useState({
@@ -23,58 +25,122 @@ export default function GirlsGrid() {
     library: false,
     create: false,
     save: false,
+    ownedLibrary: false,
   });
-  const [errors, setErrors] = useState({ girls: "", library: "" });
+  const [errors, setErrors] = useState({
+    girls: "",
+    library: "",
+    ownedLibrary: "",
+  });
   const [createError, setCreateError] = useState("");
+  const ownedRequestRef = useRef(0);
 
   const setComposerField = useComposer((state) => state.setField);
   const setComposerImageIds = useComposer((state) => state.setImageIds);
 
+  const loadGirls = useCallback(async () => {
+    setLoading((prev) => ({ ...prev, girls: true }));
+    try {
+      const res = await fetch("/api/girls");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setGirls(data.girls ?? []);
+      setErrors((prev) => ({ ...prev, girls: "" }));
+    } catch (err) {
+      setErrors((prev) => ({
+        ...prev,
+        girls: err instanceof Error ? err.message : String(err),
+      }));
+    } finally {
+      setLoading((prev) => ({ ...prev, girls: false }));
+    }
+  }, []);
+
+  const loadLibrary = useCallback(async () => {
+    setLoading((prev) => ({ ...prev, library: true }));
+    try {
+      const res = await fetch("/api/library?limit=160");
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      setLibrary(data.images ?? []);
+      setErrors((prev) => ({ ...prev, library: "" }));
+    } catch (err) {
+      setErrors((prev) => ({
+        ...prev,
+        library: err instanceof Error ? err.message : String(err),
+      }));
+    } finally {
+      setLoading((prev) => ({ ...prev, library: false }));
+    }
+  }, []);
+
+  const loadOwnedLibrary = useCallback(async (girlId) => {
+    const requestId = Date.now();
+    ownedRequestRef.current = requestId;
+
+    if (!girlId) {
+      setOwnedLibrary([]);
+      setErrors((prev) => ({ ...prev, ownedLibrary: "" }));
+      setLoading((prev) => ({ ...prev, ownedLibrary: false }));
+      return;
+    }
+
+    setLoading((prev) => ({ ...prev, ownedLibrary: true }));
+    try {
+      const res = await fetch(`/api/girls/${girlId}/images`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      if (ownedRequestRef.current === requestId) {
+        setOwnedLibrary(data.images ?? []);
+        setErrors((prev) => ({ ...prev, ownedLibrary: "" }));
+      }
+    } catch (err) {
+      if (ownedRequestRef.current === requestId) {
+        setErrors((prev) => ({
+          ...prev,
+          ownedLibrary: err instanceof Error ? err.message : String(err),
+        }));
+      }
+    } finally {
+      if (ownedRequestRef.current === requestId) {
+        setLoading((prev) => ({ ...prev, ownedLibrary: false }));
+      }
+    }
+  }, []);
+
   useEffect(() => {
-    const loadGirls = async () => {
-      setLoading((prev) => ({ ...prev, girls: true }));
-      try {
-        const res = await fetch("/api/girls");
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        setGirls(data.girls ?? []);
-        setErrors((prev) => ({ ...prev, girls: "" }));
-      } catch (err) {
-        setErrors((prev) => ({
-          ...prev,
-          girls: err instanceof Error ? err.message : String(err),
-        }));
-      } finally {
-        setLoading((prev) => ({ ...prev, girls: false }));
-      }
-    };
-
-    const loadLibrary = async () => {
-      setLoading((prev) => ({ ...prev, library: true }));
-      try {
-        const res = await fetch("/api/library?limit=120");
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        setLibrary(data.images ?? []);
-        setErrors((prev) => ({ ...prev, library: "" }));
-      } catch (err) {
-        setErrors((prev) => ({
-          ...prev,
-          library: err instanceof Error ? err.message : String(err),
-        }));
-      } finally {
-        setLoading((prev) => ({ ...prev, library: false }));
-      }
-    };
-
     loadGirls();
     loadLibrary();
-  }, []);
+  }, [loadGirls, loadLibrary]);
+
+  useEffect(() => {
+    loadOwnedLibrary(selectedGirlId);
+  }, [loadOwnedLibrary, selectedGirlId]);
 
   const selectedGirl = useMemo(
     () => girls.find((girl) => girl.id === selectedGirlId),
     [girls, selectedGirlId]
   );
+
+  const { selectedOwnedCount, selectedSharedCount } = useMemo(() => {
+    const ownedIds = new Set(ownedLibrary.map((image) => image.id));
+    let owned = 0;
+    editForm.refImageIds.forEach((id) => {
+      if (ownedIds.has(id)) {
+        owned += 1;
+      }
+    });
+    return {
+      selectedOwnedCount: owned,
+      selectedSharedCount: editForm.refImageIds.length - owned,
+    };
+  }, [editForm.refImageIds, ownedLibrary]);
+
+  const girlNameForUpload = useMemo(() => {
+    if (!selectedGirl) return "this girl";
+    const trimmed = (selectedGirl.name || "").trim();
+    return trimmed.length > 0 ? trimmed : "this girl";
+  }, [selectedGirl]);
 
   useEffect(() => {
     if (!selectedGirl) return;
@@ -117,23 +183,34 @@ export default function GirlsGrid() {
     }
   };
 
-  const refreshGirls = async () => {
-    setLoading((prev) => ({ ...prev, girls: true }));
-    try {
-      const res = await fetch("/api/girls");
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setGirls(data.girls ?? []);
-      setErrors((prev) => ({ ...prev, girls: "" }));
-    } catch (err) {
-      setErrors((prev) => ({
-        ...prev,
-        girls: err instanceof Error ? err.message : String(err),
-      }));
-    } finally {
-      setLoading((prev) => ({ ...prev, girls: false }));
-    }
-  };
+  const refreshGirls = useCallback(async () => {
+    await loadGirls();
+  }, [loadGirls]);
+
+  const handleOwnedUpload = useCallback(
+    async (uploaded = []) => {
+      if (!selectedGirlId) return;
+      await loadOwnedLibrary(selectedGirlId);
+      if (!Array.isArray(uploaded) || uploaded.length === 0) {
+        return;
+      }
+      const newIds = uploaded
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          return typeof item.imageId === "string" ? item.imageId : null;
+        })
+        .filter(Boolean);
+      if (newIds.length === 0) return;
+      setEditForm((prev) => {
+        const existing = prev.refImageIds.filter(
+          (refId) => !newIds.includes(refId)
+        );
+        const merged = [...newIds, ...existing];
+        return { ...prev, refImageIds: merged.slice(0, 2) };
+      });
+    },
+    [loadOwnedLibrary, selectedGirlId]
+  );
 
   const toggleRefImage = (id) => {
     setEditForm((prev) => {
@@ -149,6 +226,46 @@ export default function GirlsGrid() {
       }
       return { ...prev, refImageIds: [...prev.refImageIds, id] };
     });
+  };
+
+  const renderReferenceButton = (image, category) => {
+    const isSelected = editForm.refImageIds.includes(image.id);
+    return (
+      <button
+        key={image.id}
+        type="button"
+        onClick={() => toggleRefImage(image.id)}
+        className={cn(
+          "relative overflow-hidden rounded-xl border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-500",
+          isSelected
+            ? "border-slate-900 ring-2 ring-slate-400 dark:border-slate-100 dark:ring-slate-600"
+            : "border-transparent hover:translate-y-[-1px]"
+        )}
+      >
+        <Image
+          src={image.publicUrl}
+          alt={image.filename || "reference"}
+          width={160}
+          height={160}
+          className="h-24 w-full object-cover"
+        />
+        {category === "owned" && (
+          <span className="absolute left-2 top-2 rounded-full bg-slate-900/90 px-2 py-0.5 text-[10px] font-semibold uppercase text-white dark:bg-slate-100/90 dark:text-slate-900">
+            Private
+          </span>
+        )}
+        <span
+          className={cn(
+            "absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+            isSelected
+              ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+              : "bg-white/80 text-slate-600 backdrop-blur dark:bg-slate-900/80 dark:text-slate-200"
+          )}
+        >
+          {isSelected ? "Selected" : "Select"}
+        </span>
+      </button>
+    );
   };
 
   const handleSave = async () => {
@@ -332,62 +449,76 @@ export default function GirlsGrid() {
               </label>
             </div>
 
-            <section className="flex-1">
-              <div className="flex items-center justify-between text-sm">
+            <section className="flex-1 space-y-5">
+              <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-slate-700 dark:text-slate-200">
-                  Primary references ({editForm.refImageIds.length}/2)
+                  References ({editForm.refImageIds.length}/2)
                 </span>
-                <div className="flex items-center gap-3 text-xs">
-                  {errors.library && (
-                    <span className="text-rose-500">{errors.library}</span>
-                  )}
-                  {loading.library && (
-                    <span className="text-slate-500">Loading…</span>
-                  )}
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  <span>Private {selectedOwnedCount}</span>
+                  <span>Shared {Math.max(selectedSharedCount, 0)}</span>
                 </div>
               </div>
-              {library.length === 0 ? (
-                <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-                  Upload reference images in the Library tab.
-                </p>
-              ) : (
-                <div className="mt-3 grid grid-cols-3 gap-3 lg:grid-cols-4">
-                  {library.map((image) => {
-                    const isSelected = editForm.refImageIds.includes(image.id);
-                    return (
-                      <button
-                        key={image.id}
-                        type="button"
-                        onClick={() => toggleRefImage(image.id)}
-                        className={cn(
-                          "relative overflow-hidden rounded-xl border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-500",
-                          isSelected
-                            ? "border-slate-900 ring-2 ring-slate-400 dark:border-slate-100 dark:ring-slate-600"
-                            : "border-transparent hover:translate-y-[-1px]"
-                        )}
-                      >
-                        <Image
-                          src={image.publicUrl}
-                          alt={image.filename || "reference"}
-                          width={160}
-                          height={160}
-                          className="h-24 w-full object-cover"
-                        />
-                        <span
-                          className={cn(
-                            "absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
-                            isSelected
-                              ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                              : "bg-white/80 text-slate-600 backdrop-blur dark:bg-slate-900/80 dark:text-slate-200"
-                          )}
-                        >
-                          {isSelected ? "Primary" : "Select"}
-                        </span>
-                      </button>
-                    );
-                  })}
+
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Girl-specific references
+                  </div>
+                  <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
+                    {errors.ownedLibrary && (
+                      <span className="text-rose-500">{errors.ownedLibrary}</span>
+                    )}
+                    {loading.ownedLibrary && (
+                      <span className="text-slate-500">Loading…</span>
+                    )}
+                    <UploadButton
+                      ownerGirlId={selectedGirl.id}
+                      onUploaded={handleOwnedUpload}
+                      label={`Upload for ${girlNameForUpload}`}
+                      uploadingLabel="Uploading…"
+                    />
+                  </div>
                 </div>
-              )}
+                {ownedLibrary.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                    No private references yet. Use the upload button above to add one.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+                    {ownedLibrary.map((image) =>
+                      renderReferenceButton(image, "owned")
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Shared library images
+                  </div>
+                  <div className="flex items-center gap-3 text-xs">
+                    {errors.library && (
+                      <span className="text-rose-500">{errors.library}</span>
+                    )}
+                    {loading.library && (
+                      <span className="text-slate-500">Loading…</span>
+                    )}
+                  </div>
+                </div>
+                {library.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                    No shared images yet. Upload them from the Library tab.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+                    {library.map((image) =>
+                      renderReferenceButton(image, "shared")
+                    )}
+                  </div>
+                )}
+              </div>
             </section>
 
             <div className="flex justify-end gap-2">

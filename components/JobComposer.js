@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { ASPECT_RATIOS } from "@/lib/constants";
 import { useComposer } from "@/store/useComposer";
@@ -38,10 +38,23 @@ export default function JobComposer() {
 
   const [girls, setGirls] = useState([]);
   const [library, setLibrary] = useState([]);
-  const [loading, setLoading] = useState({ girls: false, library: false });
-  const [errors, setErrors] = useState({ girls: "", library: "", submit: "" });
+  const [ownedLibrary, setOwnedLibrary] = useState([]);
+  const [loading, setLoading] = useState({
+    girls: false,
+    library: false,
+    ownedLibrary: false,
+  });
+  const [errors, setErrors] = useState({
+    girls: "",
+    library: "",
+    ownedLibrary: "",
+    submit: "",
+  });
   const [urlInput, setUrlInput] = useState("");
   const [tempUploading, setTempUploading] = useState(false);
+  const ownedRequestRef = useRef(0);
+  const [showSharedLibrary, setShowSharedLibrary] = useState(false);
+  const [showOwnedLibrary, setShowOwnedLibrary] = useState(true);
 
   useEffect(() => {
     const loadGirls = async () => {
@@ -71,7 +84,7 @@ export default function JobComposer() {
     const loadLibrary = async () => {
       setLoading((prev) => ({ ...prev, library: true }));
       try {
-        const res = await fetch("/api/library?limit=120");
+        const res = await fetch("/api/library?limit=160");
         if (!res.ok) {
           throw new Error(await res.text());
         }
@@ -91,6 +104,46 @@ export default function JobComposer() {
     loadLibrary();
   }, []);
 
+  useEffect(() => {
+    const loadOwnedLibrary = async () => {
+      const requestId = Date.now();
+      ownedRequestRef.current = requestId;
+
+      if (!girlId) {
+        setOwnedLibrary([]);
+        setErrors((prev) => ({ ...prev, ownedLibrary: "" }));
+        setLoading((prev) => ({ ...prev, ownedLibrary: false }));
+        return;
+      }
+
+      setLoading((prev) => ({ ...prev, ownedLibrary: true }));
+      try {
+        const res = await fetch(`/api/girls/${girlId}/images`);
+        if (!res.ok) {
+          throw new Error(await res.text());
+        }
+        const data = await res.json();
+        if (ownedRequestRef.current === requestId) {
+          setOwnedLibrary(data.images ?? []);
+          setErrors((prev) => ({ ...prev, ownedLibrary: "" }));
+        }
+      } catch (error) {
+        if (ownedRequestRef.current === requestId) {
+          setErrors((prev) => ({
+            ...prev,
+            ownedLibrary: error instanceof Error ? error.message : String(error),
+          }));
+        }
+      } finally {
+        if (ownedRequestRef.current === requestId) {
+          setLoading((prev) => ({ ...prev, ownedLibrary: false }));
+        }
+      }
+    };
+
+    loadOwnedLibrary();
+  }, [girlId]);
+
   const selectedGirl = useMemo(
     () => girls.find((girl) => girl.id === girlId),
     [girls, girlId]
@@ -109,24 +162,20 @@ export default function JobComposer() {
     }
   }, [type, editingFromJob, clearEditingContext]);
 
-  const orderedRefs = useMemo(() => {
-    const libMap = new Map(library.map((image) => [image.id, image]));
-    const libRefs = imageIds
-      .map((id) => libMap.get(id))
-      .filter(Boolean)
-      .map((image) => ({
-        kind: "library",
-        url: image.publicUrl,
-        id: image.id,
-        filename: image.filename,
-      }));
-    const urlRefs = refUrls.map((url) => ({ kind: "url", url }));
-    return [...libRefs, ...urlRefs];
-  }, [imageIds, library, refUrls]);
-
   const totalRefs = imageIds.length + refUrls.length;
   const limitReached = totalRefs >= 3;
-  const libraryLocked = Boolean(editingFromJob) && type === "edit";
+  const baseRefUrl =
+    editingFromJob && refUrls.length > 0 ? refUrls[0] : "";
+
+  useEffect(() => {
+    if (editingFromJob) {
+      setShowOwnedLibrary(false);
+      setShowSharedLibrary(true);
+    } else {
+      setShowOwnedLibrary(true);
+      setShowSharedLibrary(false);
+    }
+  }, [editingFromJob]);
 
   const handleAddUrl = () => {
     if (limitReached) return;
@@ -150,6 +199,56 @@ export default function JobComposer() {
         submit: error instanceof Error ? error.message : String(error),
       }));
     }
+  };
+
+  const renderReferenceButton = (image, category) => {
+    const isSelected = imageIds.includes(image.id);
+    const orderIndex = isSelected ? imageIds.indexOf(image.id) : null;
+    return (
+      <button
+        key={image.id}
+        type="button"
+        onClick={() => {
+          toggleImageId(image.id);
+        }}
+        disabled={limitReached && !isSelected}
+        className={cn(
+          "group relative overflow-hidden rounded-xl border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-500",
+          isSelected
+            ? "border-slate-900 ring-2 ring-slate-400 dark:border-slate-100 dark:ring-slate-600"
+            : limitReached
+            ? "border-transparent opacity-40"
+            : "border-transparent hover:-translate-y-px"
+        )}
+      >
+        <Image
+          src={image.publicUrl}
+          alt={image.filename || "reference image"}
+          width={200}
+          height={200}
+          className="h-full w-full object-cover"
+        />
+        {category === "owned" && (
+          <span className="absolute left-2 top-2 rounded-full bg-slate-900/90 px-2 py-0.5 text-[10px] font-semibold uppercase text-white dark:bg-slate-100/90 dark:text-slate-900">
+            Private
+          </span>
+        )}
+        <span
+          className={cn(
+            "absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
+            isSelected
+              ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
+              : "bg-white/80 text-slate-600 backdrop-blur dark:bg-slate-900/80 dark:text-slate-200"
+          )}
+        >
+          {isSelected
+            ? ordinal(orderIndex)
+            : limitReached
+            ? "Max"
+            : "Tap"}
+        </span>
+      </button>
+    );
   };
 
   const onTempFile = async (file) => {
@@ -281,63 +380,46 @@ Match lighting and shadows so the subject looks naturally placed.`,
           </label>
         </div>
 
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              Reference order ({orderedRefs.length}/3)
-            </span>
-            {orderedRefs.length >= 2 && (
-              <span className="text-xs text-slate-500 dark:text-slate-400">
-                First image is the base; second image is the donor.
-              </span>
-            )}
-          </div>
-
-          {orderedRefs.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-              Select library images and/or add URLs. For editing a previous
-              output, click Edit This in the job list.
+        {editingFromJob && baseRefUrl && (
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                  Base image
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  This is the original output and counts as the first reference URL below.
+                </p>
+              </div>
+              <a
+                href={baseRefUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Open full size
+              </a>
             </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
-              {orderedRefs.map((ref, index) => (
-                <div
-                  key={`${ref.url}-${index}`}
-                  className="relative overflow-hidden rounded-xl border shadow-sm dark:border-slate-700"
-                >
+            <div className="relative w-full overflow-hidden rounded-xl border border-slate-200 bg-black/5 dark:border-slate-700">
+              <div className="relative mx-auto max-h-72 w-full max-w-2xl">
+                <div className="relative h-0 w-full pb-[56.25%]">
                   <Image
-                    src={ref.url}
-                    alt={`reference ${index + 1}`}
-                    width={220}
-                    height={220}
-                    className="h-full w-full object-cover"
+                    src={baseRefUrl}
+                    alt="Base reference"
+                    fill
+                    className="rounded-xl object-contain"
+                    sizes="(min-width: 1024px) 640px, 100vw"
                   />
-                  <div className="absolute left-2 top-2 flex items-center gap-2">
-                    <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase text-white dark:bg-slate-100 dark:text-slate-900">
-                      {ordinal(index)}{" "}
-                      {index === 0 ? "(first)" : index === 1 ? "(second)" : ""}
-                    </span>
-                    {ref.kind === "url" && (
-                      <span className="rounded-full bg-indigo-600/90 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
-                        URL
-                      </span>
-                    )}
-                    {ref.kind === "library" && (
-                      <span className="rounded-full bg-emerald-600/90 px-2 py-0.5 text-[10px] font-semibold uppercase text-white">
-                        Library
-                      </span>
-                    )}
-                  </div>
                 </div>
-              ))}
+              </div>
             </div>
-          )}
-        </div>
+          </section>
+        )}
 
-        <div className="grid gap-2">
+        <div className="grid gap-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              Library references ({imageIds.length}/3)
+              Reference library ({imageIds.length}/3)
             </span>
             <div className="flex items-center gap-3 text-xs">
               {limitReached && (
@@ -346,74 +428,95 @@ Match lighting and shadows so the subject looks naturally placed.`,
                 </span>
               )}
               {loading.library && (
-                <span className="text-slate-500">Loading library…</span>
+                <span className="text-slate-500">Loading shared…</span>
+              )}
+              {girlId && loading.ownedLibrary && (
+                <span className="text-slate-500">Loading private…</span>
               )}
             </div>
           </div>
 
-          {libraryLocked ? (
-            <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
-              Library references are disabled while editing a previous output. Use the one-time upload below for donor images.
-            </div>
-          ) : errors.library ? (
-            <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
-              {errors.library}
-            </div>
-          ) : library.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
-              Upload reference images on the Library page.
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
-              {library.map((image) => {
-                const isSelected = imageIds.includes(image.id);
-                const orderIndex = isSelected
-                  ? imageIds.indexOf(image.id)
-                  : null;
-                return (
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Girl-specific references
+                </span>
+                {ownedLibrary.length > 0 && (
                   <button
-                    key={image.id}
                     type="button"
-                    onClick={() => {
-                      if (libraryLocked) return;
-                      toggleImageId(image.id);
-                    }}
-                    disabled={(limitReached && !isSelected) || libraryLocked}
-                    className={cn(
-                      "group relative overflow-hidden rounded-xl border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-slate-500",
-                      isSelected
-                        ? "border-slate-900 ring-2 ring-slate-400 dark:border-slate-100 dark:ring-slate-600"
-                        : limitReached
-                        ? "border-transparent opacity-40"
-                        : "border-transparent hover:-translate-y-px"
-                    )}
+                    onClick={() =>
+                      setShowOwnedLibrary((prev) => !prev)
+                    }
+                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
                   >
-                    <Image
-                      src={image.publicUrl}
-                      alt={image.filename || "reference image"}
-                      width={200}
-                      height={200}
-                      className="h-full w-full object-cover"
-                    />
-                    <span
-                      className={cn(
-                        "absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase",
-                        isSelected
-                          ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900"
-                          : "bg-white/80 text-slate-600 backdrop-blur dark:bg-slate-900/80 dark:text-slate-200"
-                      )}
-                    >
-                      {isSelected
-                        ? ordinal(orderIndex)
-                        : limitReached
-                        ? "Max"
-                        : "Tap"}
-                    </span>
+                    {showOwnedLibrary ? "Hide private images" : "Show private images"}
                   </button>
-                );
-              })}
+                )}
+              </div>
+              {!girlId ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                  Select a girl above to access private references.
+                </div>
+              ) : errors.ownedLibrary ? (
+                <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
+                  {errors.ownedLibrary}
+                </div>
+              ) : ownedLibrary.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                  No private references yet. Upload them from the Girls page.
+                </div>
+              ) : showOwnedLibrary ? (
+                <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
+                  {ownedLibrary.map((image) =>
+                    renderReferenceButton(image, "owned")
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                  Private references hidden. Click "Show private images" to browse them.
+                </div>
+              )}
             </div>
-          )}
+
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  Shared library images
+                </span>
+                {library.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowSharedLibrary((prev) => !prev)
+                    }
+                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                  >
+                    {showSharedLibrary ? "Hide shared images" : "Show shared images"}
+                  </button>
+                )}
+              </div>
+              {errors.library ? (
+                <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
+                  {errors.library}
+                </div>
+              ) : library.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                  Upload reference images on the Library page.
+                </div>
+              ) : showSharedLibrary ? (
+                <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
+                  {library.map((image) =>
+                    renderReferenceButton(image, "shared")
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                  Shared library hidden. Click "Show shared images" to browse all shared assets.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="grid gap-2">
@@ -573,7 +676,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800">
         <span className="text-slate-500 dark:text-slate-400">
-          {orderedRefs.length} references selected ·{" "}
+          {totalRefs} references selected ·{" "}
           {type === "edit" ? "Edit" : "Generate"} job
         </span>
         <div className="flex gap-2">

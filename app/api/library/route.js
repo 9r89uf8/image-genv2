@@ -13,14 +13,16 @@ export async function GET(request) {
     .limit(limit)
     .get();
 
-  const images = snapshot.docs.map((doc) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      createdAt: data.createdAt?.toDate?.().toISOString?.() ?? null,
-    };
-  });
+  const images = snapshot.docs
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate?.().toISOString?.() ?? null,
+      };
+    })
+    .filter((image) => !image.ownerId);
 
   return Response.json({ images });
 }

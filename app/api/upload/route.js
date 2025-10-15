@@ -7,6 +7,11 @@ import { v4 as uuid } from "uuid";
 export async function POST(request) {
   const formData = await request.formData();
   const file = formData.get("file");
+  const girlIdEntry = formData.get("girlId");
+  const ownerId =
+    typeof girlIdEntry === "string" && girlIdEntry.trim()
+      ? girlIdEntry.trim()
+      : null;
 
   if (!file || typeof file === "string") {
     return Response.json({ error: "missing file" }, { status: 400 });
@@ -48,6 +53,7 @@ export async function POST(request) {
     filename: file.name || `${id}.${ext}`,
     createdAt: Timestamp.now(),
     tags: [],
+    ownerId,
   });
 
   return Response.json({
@@ -55,5 +61,6 @@ export async function POST(request) {
     publicUrl,
     storagePath,
     mimeType,
+    ownerId,
   });
 }
