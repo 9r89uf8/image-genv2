@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from "zustand";
-import { ASPECT_RATIOS } from "@/lib/constants";
+import { ASPECT_RATIOS, DEFAULT_ASPECT_RATIO } from "@/lib/constants";
 
 const defaultState = {
   type: "generate",
@@ -9,7 +9,7 @@ const defaultState = {
   imageIds: [],
   refUrls: [],
   prompt: "",
-  aspectRatio: ASPECT_RATIOS[0],
+  aspectRatio: DEFAULT_ASPECT_RATIO,
   imageOnly: false,
   chatMode: false,
   isSubmitting: false,
@@ -56,7 +56,7 @@ export const useComposer = create((set, get) => ({
 
   loadJobForEditing: (job) => {
     const firstUrl = job?.result?.publicUrl || "";
-    const aspectRatio = job?.inputs?.aspectRatio || ASPECT_RATIOS[0];
+    const aspectRatio = job?.inputs?.aspectRatio || DEFAULT_ASPECT_RATIO;
     set({
       type: "edit",
       girlId: job?.girlId || "",
@@ -90,6 +90,44 @@ export const useComposer = create((set, get) => ({
 
     set({ isSubmitting: true });
     try {
+      if (state.chatMode) {
+        const res1 = await fetch("/api/chat/sessions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            title: "Composer chat",
+            girlId: state.girlId || "",
+            aspectRatio: state.aspectRatio,
+          }),
+        });
+        if (!res1.ok) {
+          throw new Error((await res1.text()) || "Failed to create chat");
+        }
+        const { id: sessionId } = await res1.json();
+
+        const res2 = await fetch(`/api/chat/sessions/${sessionId}/message`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            text: state.prompt,
+            imageIds: state.imageIds,
+            refUrls: state.refUrls,
+            imageOnly: state.imageOnly,
+            aspectRatio: state.aspectRatio,
+          }),
+        });
+        if (!res2.ok) {
+          throw new Error((await res2.text()) || "Failed to send chat message");
+        }
+
+        if (typeof window !== "undefined") {
+          const url = new URL("/chat", window.location.origin);
+          url.searchParams.set("session", sessionId);
+          window.location.assign(url.toString());
+        }
+        return null;
+      }
+
       const res = await fetch("/api/jobs", {
         method: "POST",
         headers: { "content-type": "application/json" },
