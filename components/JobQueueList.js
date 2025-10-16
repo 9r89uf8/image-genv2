@@ -221,9 +221,9 @@ export default function JobQueueList() {
                         {girlNameById[job.girlId] ?? "Unknown girl"}
                       </span>
                     )}
-                    <span className="text-slate-500 dark:text-slate-400">
-                      {job.type === "edit" ? "Edit" : "Generate"} · ID {job.id}
-                    </span>
+                    {/*<span className="text-slate-500 dark:text-slate-400">*/}
+                    {/*  {job.type === "edit" ? "Edit" : "Generate"} · ID {job.id}*/}
+                    {/*</span>*/}
                   </div>
                   <span className="text-xs text-slate-400">
                     Created {formatDate(job.createdAt)}

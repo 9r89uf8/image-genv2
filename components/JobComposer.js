@@ -40,22 +40,22 @@ function RefUrlPreview({ url, orderLabel, onRemove }) {
   const { displayName, hostname } = useMemo(() => getUrlMeta(url), [url]);
 
   return (
-    <div className="group relative flex w-full max-w-[220px] flex-col gap-2 rounded-xl border border-slate-200 bg-white p-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-900">
+    <div className="group relative flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-sm sm:p-2 dark:border-slate-700 dark:bg-slate-900">
       <div className="flex items-center justify-between">
-        <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white dark:bg-slate-100 dark:text-slate-900">
+        <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-white sm:px-2 sm:py-0.5 sm:text-[10px] dark:bg-slate-100 dark:text-slate-900">
           {orderLabel}
         </span>
         <button
           type="button"
           onClick={onRemove}
-          className="rounded-full bg-slate-300 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 transition hover:bg-slate-400 dark:bg-slate-600 dark:text-slate-200 dark:hover:bg-slate-500"
+          className="rounded-full bg-slate-300 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:bg-slate-400 sm:px-2.5 sm:py-1 sm:text-[11px] dark:bg-slate-600 dark:text-slate-200 dark:hover:bg-slate-500"
         >
           Remove
         </button>
       </div>
       <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800">
         {failed ? (
-          <div className="flex h-full items-center justify-center px-2 text-center text-[11px] text-slate-500 dark:text-slate-400">
+          <div className="flex h-full items-center justify-center px-2 text-center text-xs text-slate-500 sm:text-[11px] dark:text-slate-400">
             Preview unavailable
           </div>
         ) : (
@@ -74,12 +74,12 @@ function RefUrlPreview({ url, orderLabel, onRemove }) {
           href={url}
           target="_blank"
           rel="noreferrer"
-          className="truncate font-medium text-slate-700 underline decoration-dotted underline-offset-2 dark:text-slate-200"
+          className="truncate text-sm font-medium text-slate-700 underline decoration-dotted underline-offset-2 sm:text-xs dark:text-slate-200"
         >
           {displayName}
         </a>
         {hostname && (
-          <span className="truncate text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <span className="truncate text-xs uppercase tracking-wide text-slate-500 sm:text-[10px] dark:text-slate-400">
             {hostname}
           </span>
         )}
@@ -372,7 +372,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
     <form
       id="composer"
       onSubmit={handleSubmit}
-      className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 dark:border-slate-800 dark:bg-slate-900"
     >
       {editingFromJob && (
         <div className="mb-4 rounded-lg border border-indigo-300 bg-indigo-50 p-3 text-sm text-indigo-800 dark:border-indigo-500/40 dark:bg-indigo-500/10 dark:text-indigo-200">
@@ -385,14 +385,14 @@ Match lighting and shadows so the subject looks naturally placed.`,
       )}
 
       <div className="mb-4">
-        <h2 className="text-lg font-semibold">Job Composer</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400">
+        <h2 className="break-words text-lg font-semibold sm:text-xl">Job Composer</h2>
+        <p className="break-words text-sm text-slate-500 sm:text-sm dark:text-slate-400">
           Assemble prompt, references, and options. Max three references per job.
         </p>
       </div>
 
-      <div className="grid gap-6">
-        <div className="grid gap-3 md:grid-cols-2">
+      <div className="grid min-w-0 gap-4 sm:gap-6">
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
           <label className="flex flex-col gap-2 text-sm">
             <span className="font-medium text-slate-700 dark:text-slate-200">
               Girl
@@ -401,7 +401,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
               value={girlId}
               onChange={(event) => setField("girlId", event.target.value)}
               disabled={Boolean(editingFromJob)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 sm:py-2 sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
             >
               <option value="">None</option>
               {girls.map((girl) => (
@@ -411,10 +411,10 @@ Match lighting and shadows so the subject looks naturally placed.`,
               ))}
             </select>
             {loading.girls && (
-              <span className="text-xs text-slate-500">Loading girls…</span>
+              <span className="text-sm text-slate-500 sm:text-xs">Loading girls…</span>
             )}
             {errors.girls && (
-              <span className="text-xs text-red-500">{errors.girls}</span>
+              <span className="text-sm text-red-500 sm:text-xs">{errors.girls}</span>
             )}
           </label>
 
@@ -425,7 +425,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
             <select
               value={aspectRatio}
               onChange={(event) => setField("aspectRatio", event.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 sm:py-2 sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
             >
               {ASPECT_RATIOS.map((ratio) => (
                 <option key={ratio} value={ratio}>
@@ -437,8 +437,8 @@ Match lighting and shadows so the subject looks naturally placed.`,
         </div>
 
         {editingFromJob && baseRefUrl && (
-          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4 dark:border-slate-800 dark:bg-slate-900">
+            <div className="mb-3 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
               <div>
                 <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                   Base image
@@ -451,7 +451,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
                 href={baseRefUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                className="w-full rounded-full border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
               >
                 Open full size
               </a>
@@ -472,12 +472,12 @@ Match lighting and shadows so the subject looks naturally placed.`,
           </section>
         )}
 
-        <div className="grid gap-3">
-          <div className="flex items-center justify-between">
+        <div className="grid min-w-0 gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
               Reference library ({imageIds.length}/3)
             </span>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex flex-wrap items-center gap-3 text-xs sm:text-xs">
               {limitReached && (
                 <span className="text-amber-600 dark:text-amber-400">
                   Max 3 references reached
@@ -504,32 +504,32 @@ Match lighting and shadows so the subject looks naturally placed.`,
                     onClick={() =>
                       setShowOwnedLibrary((prev) => !prev)
                     }
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                    className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
                   >
                     {showOwnedLibrary ? "Hide private images" : "Show private images"}
                   </button>
                 )}
               </div>
               {!girlId ? (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 sm:text-xs dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
                   Select a girl above to access private references.
                 </div>
               ) : errors.ownedLibrary ? (
-                <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
+                <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-sm text-red-700 sm:text-xs dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
                   {errors.ownedLibrary}
                 </div>
               ) : ownedLibrary.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 sm:text-xs dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
                   No private references yet. Upload them from the Girls page.
                 </div>
               ) : showOwnedLibrary ? (
-                <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {ownedLibrary.map((image) =>
                     renderReferenceButton(image, "owned")
                   )}
                 </div>
               ) : (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 sm:text-xs dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
                   Private references hidden. Click "Show private images" to browse them.
                 </div>
               )}
@@ -546,28 +546,28 @@ Match lighting and shadows so the subject looks naturally placed.`,
                     onClick={() =>
                       setShowSharedLibrary((prev) => !prev)
                     }
-                    className="rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+                    className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
                   >
                     {showSharedLibrary ? "Hide shared images" : "Show shared images"}
                   </button>
                 )}
               </div>
               {errors.library ? (
-                <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-xs text-red-700 dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
+                <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-sm text-red-700 sm:text-xs dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
                   {errors.library}
                 </div>
               ) : library.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 sm:text-xs dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
                   Upload reference images on the Library page.
                 </div>
               ) : showSharedLibrary ? (
-                <div className="grid grid-cols-3 gap-3 md:grid-cols-4">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {library.map((image) =>
                     renderReferenceButton(image, "shared")
                   )}
                 </div>
               ) : (
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 sm:text-xs dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
                   Shared library hidden. Click "Show shared images" to browse all shared assets.
                 </div>
               )}
@@ -575,18 +575,17 @@ Match lighting and shadows so the subject looks naturally placed.`,
           </div>
         </div>
 
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between">
+        <div className="grid min-w-0 gap-2">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              External/temporary URLs ({refUrls.length}/3)
+              Temporary images ({refUrls.length}/3)
             </label>
-            <div className="text-xs text-slate-500 dark:text-slate-400">
-              One-time images upload below; they will not persist in the
-              library.
+            <div className="break-words text-xs text-slate-500 dark:text-slate-400 sm:text-right">
+              Upload from device • Not saved to library
             </div>
           </div>
 
-          <div className="flex flex-wrap items-start gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {refUrls.map((url, index) => (
               <RefUrlPreview
                 key={url}
@@ -595,40 +594,15 @@ Match lighting and shadows so the subject looks naturally placed.`,
                 onRemove={() => removeRefUrl(url)}
               />
             ))}
-
-            {totalRefs < 3 && (
-              <div className="flex items-center gap-2 rounded-full border border-dashed border-slate-300 bg-white px-3 py-1 text-xs dark:border-slate-700 dark:bg-slate-950">
-                <input
-                  type="url"
-                  placeholder="https://…"
-                  value={urlInput}
-                  onChange={(event) => setUrlInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      handleAddUrl();
-                    }
-                  }}
-                  className="w-32 bg-transparent text-xs focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddUrl}
-                  className="rounded-full bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white transition hover:bg-slate-800 disabled:opacity-40 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
-                  disabled={!urlInput.trim()}
-                >
-                  Add
-                </button>
-              </div>
-            )}
           </div>
 
           {totalRefs < 3 && (
-            <div className="mt-2 flex items-center gap-3">
-              <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
-                <span className="rounded bg-slate-100 px-2 py-1 dark:bg-slate-800">
-                  One-time image:
-                </span>
+            <div className="flex items-center gap-3">
+              <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 sm:w-auto sm:px-4 sm:py-3 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Upload image from device</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -638,39 +612,39 @@ Match lighting and shadows so the subject looks naturally placed.`,
                     event.target.value = "";
                   }}
                   disabled={tempUploading}
-                  className="text-xs"
+                  className="hidden"
                 />
               </label>
               {tempUploading && (
-                <span className="text-xs text-slate-500">Uploading…</span>
+                <span className="text-sm text-slate-500 sm:text-xs">Uploading…</span>
               )}
             </div>
           )}
         </div>
 
-        <div className="grid gap-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+        <div className="grid min-w-0 gap-3">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:text-xs">
               Prompt templates
             </span>
             <button
               type="button"
               onClick={() => applyTemplate("leggings")}
-              className="rounded-full border border-slate-300 px-2 py-0.5 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="w-full rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               Replace leggings
             </button>
             <button
               type="button"
               onClick={() => applyTemplate("object")}
-              className="rounded-full border border-slate-300 px-2 py-0.5 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="w-full rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               Add object
             </button>
             <button
               type="button"
               onClick={() => applyTemplate("background")}
-              className="rounded-full border border-slate-300 px-2 py-0.5 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              className="w-full rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
             >
               Replace background
             </button>
@@ -685,7 +659,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
           />
         </div>
 
-        <div className="flex flex-wrap gap-4 text-sm">
+        <div className="flex flex-col gap-3 text-sm sm:flex-row sm:gap-4">
           <label className="flex items-center gap-2 font-medium text-slate-700 dark:text-slate-200">
             <input
               type="checkbox"
@@ -708,17 +682,17 @@ Match lighting and shadows so the subject looks naturally placed.`,
       </div>
 
       {errors.submit && (
-        <p className="mt-4 rounded-lg border border-rose-400 bg-rose-50 p-2 text-xs text-rose-700 dark:border-rose-500/60 dark:bg-rose-500/10 dark:text-rose-200">
+        <p className="mt-4 rounded-lg border border-rose-400 bg-rose-50 p-3 text-sm text-rose-700 sm:text-xs dark:border-rose-500/60 dark:bg-rose-500/10 dark:text-rose-200">
           {errors.submit}
         </p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 text-sm dark:border-slate-800">
+      <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-4 text-sm sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
         <span className="text-slate-500 dark:text-slate-400">
           {totalRefs} references selected ·{" "}
           {type === "edit" ? "Edit" : "Generate"} job
         </span>
-        <div className="flex gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
             onClick={() => {
@@ -728,14 +702,14 @@ Match lighting and shadows so the subject looks naturally placed.`,
               clearReferences();
               clearEditingContext();
             }}
-            className="rounded-full border border-slate-300 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="w-full rounded-full border border-slate-300 px-4 py-2.5 font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:py-2 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             Clear
           </button>
           <button
             type="submit"
             disabled={isSubmitting}
-            className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:opacity-60 sm:w-auto sm:py-2 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
           >
             {isSubmitting ? "Enqueuing…" : "Enqueue job"}
           </button>

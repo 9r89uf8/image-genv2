@@ -34,12 +34,6 @@ export default function RootLayout({ children }) {
         <div className="min-h-screen">
           <header className="border-b border-slate-200 bg-white/70 backdrop-blur dark:border-slate-800 dark:bg-slate-900/70">
             <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4 lg:px-8">
-              <Link
-                href="/"
-                className="text-lg font-semibold tracking-tight transition hover:opacity-80"
-              >
-                Nano Banana Studio
-              </Link>
               <nav className="flex items-center gap-4 text-sm font-medium">
                 {navLinks.map((link) => (
                   <Link
