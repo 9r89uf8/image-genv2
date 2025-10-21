@@ -1,5 +1,5 @@
 'use client';
-
+//components/GirlsGrid.js
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useComposer } from "@/store/useComposer";
