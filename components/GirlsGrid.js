@@ -433,14 +433,14 @@ export default function GirlsGrid() {
       <div
         key={type}
         className={cn(
-          "space-y-3 rounded-xl border p-4 shadow-sm transition",
+          "min-w-0 space-y-3 rounded-xl border p-4 shadow-sm transition",
           isDirty
             ? "border-indigo-400 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10"
             : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
         )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
+        <div className="flex flex-wrap items-start gap-3">
+          <div className="min-w-0 flex-1">
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
               {CONTEXT_LABELS[type]}
             </h3>
@@ -448,7 +448,7 @@ export default function GirlsGrid() {
               Keep her {type} consistent across generations.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-wrap items-start gap-2 sm:ml-auto sm:w-auto sm:flex-nowrap sm:justify-end">
             {asset.imageId && (
               <button
                 type="button"
@@ -485,7 +485,7 @@ export default function GirlsGrid() {
             </div>
           )}
         </div>
-        <label className="grid gap-1 text-xs">
+        <label className="grid w-full gap-1 text-xs">
           <span className="font-semibold text-slate-600 dark:text-slate-300">
             Use existing image
           </span>
@@ -494,17 +494,22 @@ export default function GirlsGrid() {
             onChange={(event) =>
               handleContextSelectImage(type, event.target.value)
             }
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
+            className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
           >
             <option value="">No image</option>
-            {ownedLibrary.map((image) => (
-              <option key={image.id} value={image.id}>
-                {image.filename || image.id}
-              </option>
-            ))}
+            {ownedLibrary.map((image) => {
+              const rawLabel = image.filename || image.id || "";
+              const trimmedLabel =
+                rawLabel.length > 60 ? `${rawLabel.slice(0, 57)}…` : rawLabel;
+              return (
+                <option key={image.id} value={image.id} title={rawLabel}>
+                  {trimmedLabel}
+                </option>
+              );
+            })}
           </select>
         </label>
-        <label className="grid gap-1 text-xs">
+        <label className="grid w-full gap-1 text-xs">
           <span className="font-semibold text-slate-600 dark:text-slate-300">
             Prompt description
           </span>
@@ -600,7 +605,7 @@ export default function GirlsGrid() {
 
   return (
     <div className="grid gap-6 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0">
         <form
           onSubmit={handleCreate}
           className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
@@ -656,7 +661,7 @@ export default function GirlsGrid() {
         </form>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <header className="mb-4 flex items-center justify-between">
+          <header className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold">Girls</h2>
             {loading.girls && (
               <span className="text-xs text-slate-500">Refreshing…</span>
@@ -684,11 +689,11 @@ export default function GirlsGrid() {
                         : "border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:hover:bg-slate-800"
                     )}
                   >
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold text-slate-800 dark:text-slate-100">
+                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="min-w-0 flex-1 font-semibold text-slate-800 dark:text-slate-100">
                         {girl.name || "Unnamed"}
                       </span>
-                      <span className="text-xs text-slate-500">
+                      <span className="text-xs text-slate-500 sm:ml-auto">
                         {Array.isArray(girl.refImageIds)
                           ? `${girl.refImageIds.length} refs`
                           : "0 refs"}
@@ -707,11 +712,11 @@ export default function GirlsGrid() {
         </section>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         {selectedGirl ? (
-          <div className="flex h-full flex-col gap-4">
-            <header className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">
+          <div className="flex h-full min-w-0 flex-col gap-4">
+            <header className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="min-w-0 text-lg font-semibold">
                 Manage {selectedGirl.name || "Unnamed"}
               </h2>
               <button
@@ -720,7 +725,7 @@ export default function GirlsGrid() {
                   setComposerField("girlId", selectedGirl.id);
                   setComposerImageIds(editForm.refImageIds);
                 }}
-                className="rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
+                className="w-full rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200 sm:ml-auto sm:w-auto"
               >
                 Use in composer
               </button>
@@ -762,7 +767,7 @@ export default function GirlsGrid() {
               </label>
             </div>
 
-            <section className="flex-1 space-y-5">
+            <section className="flex-1 min-w-0 space-y-5">
               <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
                 <span className="font-medium text-slate-700 dark:text-slate-200">
                   References ({editForm.refImageIds.length}/2)
@@ -774,14 +779,14 @@ export default function GirlsGrid() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Girl-specific references
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-3 text-xs">
-                    {errors.ownedLibrary && (
-                      <span className="text-rose-500">{errors.ownedLibrary}</span>
-                    )}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Girl-specific references
+                    </div>
+                    <div className="flex w-full flex-wrap items-center justify-end gap-3 text-xs sm:w-auto">
+                      {errors.ownedLibrary && (
+                        <span className="text-rose-500">{errors.ownedLibrary}</span>
+                      )}
                     {loading.ownedLibrary && (
                       <span className="text-slate-500">Loading…</span>
                     )}
@@ -798,7 +803,7 @@ export default function GirlsGrid() {
                     No private references yet. Use the upload button above to add one.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     {ownedLibrary.map((image) =>
                       renderReferenceButton(image, "owned")
                     )}
@@ -807,14 +812,14 @@ export default function GirlsGrid() {
               </div>
 
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Shared library images
-                  </div>
-                  <div className="flex items-center gap-3 text-xs">
-                    {errors.library && (
-                      <span className="text-rose-500">{errors.library}</span>
-                    )}
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Shared library images
+                    </div>
+                    <div className="flex w-full flex-wrap items-center gap-3 text-xs sm:w-auto">
+                      {errors.library && (
+                        <span className="text-rose-500">{errors.library}</span>
+                      )}
                     {loading.library && (
                       <span className="text-slate-500">Loading…</span>
                     )}
@@ -825,7 +830,7 @@ export default function GirlsGrid() {
                     No shared images yet. Upload them from the Library tab.
                   </p>
                 ) : (
-                  <div className="grid grid-cols-3 gap-3 lg:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                     {library.map((image) =>
                       renderReferenceButton(image, "shared")
                     )}
