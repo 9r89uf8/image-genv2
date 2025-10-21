@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 
 import { bucket, db, Timestamp } from "@/lib/firebase-admin";
 import { v4 as uuid } from "uuid";
+import { isValidContextType } from "@/lib/context";
 
 export async function POST(request) {
   const formData = await request.formData();
@@ -12,6 +13,25 @@ export async function POST(request) {
     typeof girlIdEntry === "string" && girlIdEntry.trim()
       ? girlIdEntry.trim()
       : null;
+  const contextTypeEntry = formData.get("contextType");
+  const rawContextType =
+    typeof contextTypeEntry === "string" && contextTypeEntry.trim()
+      ? contextTypeEntry.trim().toLowerCase()
+      : "";
+
+  if (rawContextType && !isValidContextType(rawContextType)) {
+    return Response.json(
+      { error: "invalid context type" },
+      { status: 400 }
+    );
+  }
+
+  if (rawContextType && !ownerId) {
+    return Response.json(
+      { error: "context uploads require a girlId" },
+      { status: 400 }
+    );
+  }
 
   if (!file || typeof file === "string") {
     return Response.json({ error: "missing file" }, { status: 400 });
@@ -46,7 +66,7 @@ export async function POST(request) {
 
   const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
 
-  await db.collection("library").doc(id).set({
+  const docData = {
     storagePath,
     publicUrl,
     mimeType,
@@ -54,7 +74,14 @@ export async function POST(request) {
     createdAt: Timestamp.now(),
     tags: [],
     ownerId,
-  });
+    category: rawContextType ? "context" : "general",
+  };
+
+  if (rawContextType) {
+    docData.contextType = rawContextType;
+  }
+
+  await db.collection("library").doc(id).set(docData);
 
   return Response.json({
     imageId: id,
@@ -62,5 +89,7 @@ export async function POST(request) {
     storagePath,
     mimeType,
     ownerId,
+    contextType: rawContextType || null,
+    category: docData.category,
   });
 }

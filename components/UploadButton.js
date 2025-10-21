@@ -5,8 +5,10 @@ import { useMemo, useRef, useState } from "react";
 export default function UploadButton({
   onUploaded,
   ownerGirlId = "",
+  contextType = "",
   label,
   uploadingLabel,
+  multiple = true,
 }) {
   const inputRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -33,11 +35,14 @@ export default function UploadButton({
     setError("");
     try {
       const uploaded = [];
-      for (const file of files) {
+      for (const file of files.slice(0, multiple ? undefined : 1)) {
         const formData = new FormData();
         formData.append("file", file);
         if (ownerGirlId) {
           formData.append("girlId", ownerGirlId);
+        }
+        if (contextType) {
+          formData.append("contextType", contextType);
         }
 
         const res = await fetch("/api/upload", {
@@ -79,7 +84,7 @@ export default function UploadButton({
         ref={inputRef}
         type="file"
         accept="image/*"
-        multiple
+        multiple={multiple}
         className="hidden"
         onChange={handleFiles}
       />

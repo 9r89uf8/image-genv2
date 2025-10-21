@@ -2,9 +2,14 @@
 //components/JobComposer.js
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ASPECT_RATIOS } from "@/lib/constants";
+import { ASPECT_RATIOS, MAX_REFERENCES, CONTEXT_TYPES } from "@/lib/constants";
 import { useComposer } from "@/store/useComposer";
 import { useQueueView } from "@/store/useQueueView";
+import {
+  createEmptyContextAssets,
+  normalizeContextAssets,
+  CONTEXT_LABELS,
+} from "@/lib/context";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 const ordinal = (index) => {
@@ -104,6 +109,15 @@ export default function JobComposer() {
   const chatMode = useComposer((state) => state.chatMode);
   const isSubmitting = useComposer((state) => state.isSubmitting);
   const clearReferences = useComposer((state) => state.clearReferences);
+  const composerContextAssets = useComposer((state) => state.contextAssets);
+  const contextSelections = useComposer((state) => state.contextSelections);
+  const setContextAssets = useComposer((state) => state.setContextAssets);
+  const setContextSelection = useComposer(
+    (state) => state.setContextSelection
+  );
+  const resetContextSelections = useComposer(
+    (state) => state.resetContextSelections
+  );
   const submit = useComposer((state) => state.submit);
   const editingFromJob = useComposer((state) => state.editingFromJob);
   const clearEditingContext = useComposer(
@@ -128,7 +142,9 @@ export default function JobComposer() {
   });
   const [urlInput, setUrlInput] = useState("");
   const [tempUploading, setTempUploading] = useState(false);
+  const [contextLimitMessage, setContextLimitMessage] = useState("");
   const ownedRequestRef = useRef(0);
+  const previousContextGirlRef = useRef("");
   const [showSharedLibrary, setShowSharedLibrary] = useState(false);
   const [showOwnedLibrary, setShowOwnedLibrary] = useState(true);
 
@@ -233,13 +249,124 @@ export default function JobComposer() {
   }, [selectedGirl, setImageIds, editingFromJob, type]);
 
   useEffect(() => {
+    const girlKey = selectedGirl?.id || "";
+    if (!girlKey) {
+      setContextAssets(createEmptyContextAssets(), { resetSelections: true });
+      resetContextSelections();
+      previousContextGirlRef.current = "";
+      setContextLimitMessage("");
+      return;
+    }
+    const normalized = normalizeContextAssets(selectedGirl.contextAssets);
+    const shouldReset = previousContextGirlRef.current !== girlKey;
+    setContextAssets(normalized, { resetSelections: shouldReset });
+    if (shouldReset) {
+      resetContextSelections();
+      setContextLimitMessage("");
+    }
+    previousContextGirlRef.current = girlKey;
+  }, [
+    selectedGirl,
+    setContextAssets,
+    resetContextSelections,
+  ]);
+
+  const ownedImageMap = useMemo(() => {
+    const map = new Map();
+    ownedLibrary.forEach((image) => {
+      map.set(image.id, image);
+    });
+    return map;
+  }, [ownedLibrary]);
+
+  const contextImageCount = useMemo(
+    () =>
+      CONTEXT_TYPES.reduce((count, typeKey) => {
+        const selection = contextSelections[typeKey];
+        const asset = composerContextAssets[typeKey];
+        if (selection?.useImage && asset?.imageId) {
+          return count + 1;
+        }
+        return count;
+      }, 0),
+    [contextSelections, composerContextAssets]
+  );
+
+  const contextAssetsWithMeta = useMemo(
+    () =>
+      CONTEXT_TYPES.reduce((acc, typeKey) => {
+        const asset = composerContextAssets[typeKey] || {
+          imageId: "",
+          description: "",
+        };
+        const image = asset.imageId
+          ? ownedImageMap.get(asset.imageId)
+          : null;
+        acc[typeKey] = { asset, image };
+        return acc;
+      }, {}),
+    [composerContextAssets, ownedImageMap]
+  );
+
+  const contextImageOrderMap = useMemo(() => {
+    let position = imageIds.length;
+    const order = {};
+    CONTEXT_TYPES.forEach((typeKey) => {
+      const selection = contextSelections[typeKey];
+      const asset = composerContextAssets[typeKey];
+      if (selection?.useImage && asset?.imageId) {
+        position += 1;
+        order[typeKey] = position;
+      }
+    });
+    return order;
+  }, [imageIds, contextSelections, composerContextAssets]);
+
+  const hasActiveContextSelections = useMemo(
+    () =>
+      CONTEXT_TYPES.some((typeKey) => {
+        const selection = contextSelections[typeKey];
+        return Boolean(selection?.useImage || selection?.useText);
+      }),
+    [contextSelections]
+  );
+
+  const totalRefs = imageIds.length + refUrls.length + contextImageCount;
+  const remainingSlots = Math.max(0, MAX_REFERENCES - totalRefs);
+  const limitReached = totalRefs >= MAX_REFERENCES;
+  const maxManualSlots = Math.max(
+    0,
+    MAX_REFERENCES - refUrls.length - contextImageCount
+  );
+  const manualSlotsRemaining = Math.max(
+    0,
+    maxManualSlots - imageIds.length
+  );
+  const maxTemporarySlots = Math.max(
+    0,
+    MAX_REFERENCES - imageIds.length - contextImageCount
+  );
+  const temporarySlotsRemaining = Math.max(
+    0,
+    maxTemporarySlots - refUrls.length
+  );
+
+  useEffect(() => {
+    if (
+      contextLimitMessage &&
+      contextLimitMessage.includes("No reference slots left") &&
+      remainingSlots > 0
+    ) {
+      setContextLimitMessage("");
+    }
+  }, [contextLimitMessage, remainingSlots]);
+
+  useEffect(() => {
     if (type !== "edit" && editingFromJob) {
       clearEditingContext();
     }
   }, [type, editingFromJob, clearEditingContext]);
 
-  const totalRefs = imageIds.length + refUrls.length;
-  const limitReached = totalRefs >= 3;
   const baseRefUrl =
     editingFromJob && refUrls.length > 0 ? refUrls[0] : "";
 
@@ -275,6 +402,57 @@ export default function JobComposer() {
         submit: error instanceof Error ? error.message : String(error),
       }));
     }
+  };
+
+  const handleContextImageToggle = (type, nextValue) => {
+    const selection = contextSelections[type] || {
+      useImage: false,
+      useText: false,
+    };
+    const asset = composerContextAssets[type] || {
+      imageId: "",
+      description: "",
+    };
+    if (selection.useImage === nextValue) return;
+    if (nextValue && !asset.imageId) {
+      setContextLimitMessage(
+        "Add an image for this context in the Girls manager before using it here."
+      );
+      return;
+    }
+    if (nextValue && totalRefs >= MAX_REFERENCES) {
+      setContextLimitMessage(
+        "No reference slots left. Remove another reference to include this context image."
+      );
+      return;
+    }
+    setContextSelection(type, { useImage: nextValue });
+    setContextLimitMessage("");
+  };
+
+  const handleContextTextToggle = (type, nextValue) => {
+    const selection = contextSelections[type] || {
+      useImage: false,
+      useText: false,
+    };
+    const asset = composerContextAssets[type] || {
+      imageId: "",
+      description: "",
+    };
+    if (selection.useText === nextValue) return;
+    if (nextValue && !asset.description) {
+      setContextLimitMessage(
+        "Add a description for this context in the Girls manager before sending it to the prompt."
+      );
+      return;
+    }
+    setContextSelection(type, { useText: nextValue });
+    setContextLimitMessage("");
+  };
+
+  const handleClearContextSelections = () => {
+    resetContextSelections();
+    setContextLimitMessage("");
   };
 
   const renderReferenceButton = (image, category) => {
@@ -324,6 +502,126 @@ export default function JobComposer() {
             : "Tap"}
         </span>
       </button>
+    );
+  };
+
+  const renderContextControl = (type) => {
+    const entry = contextAssetsWithMeta[type] || {
+      asset: { imageId: "", description: "" },
+      image: null,
+    };
+    const asset = entry.asset;
+    const image = entry.image;
+    const selection = contextSelections[type] || {
+      useImage: false,
+      useText: false,
+    };
+    const hasImage = Boolean(asset.imageId && image);
+    const hasDescription = Boolean(asset.description);
+    const referenceOrder = contextImageOrderMap[type];
+
+    return (
+      <div
+        key={type}
+        className={cn(
+          "space-y-3 rounded-xl border p-4 shadow-sm transition",
+          selection.useImage || selection.useText
+            ? "border-slate-900/50 bg-slate-100 dark:border-slate-100/40 dark:bg-slate-800/40"
+            : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {CONTEXT_LABELS[type]}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {hasImage ? "Image ready" : "No image assigned"}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-1 text-[11px] font-semibold uppercase tracking-wide">
+            {selection.useImage && hasImage && referenceOrder && (
+              <span className="rounded-full bg-slate-900 px-2 py-0.5 text-white dark:bg-slate-100 dark:text-slate-900">
+                {ordinal(referenceOrder - 1)} ref
+              </span>
+            )}
+            {selection.useText && hasDescription && (
+              <span className="rounded-full bg-slate-200 px-2 py-0.5 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
+                Prompt text
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+          {hasImage ? (
+            <Image
+              src={image.publicUrl}
+              alt={`${CONTEXT_LABELS[type]} reference`}
+              width={320}
+              height={320}
+              className="h-32 w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-32 items-center justify-center px-3 text-center">
+              Manage this {CONTEXT_LABELS[type].toLowerCase()} image from the
+              Girls page.
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 text-xs">
+          <label
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border px-3 py-2 transition",
+              hasImage
+                ? "cursor-pointer border-slate-300 bg-white hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
+                : "cursor-not-allowed border-slate-200 bg-slate-100 opacity-60 dark:border-slate-700 dark:bg-slate-800"
+            )}
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              checked={selection.useImage && hasImage}
+              onChange={(event) =>
+                handleContextImageToggle(type, event.target.checked)
+              }
+              disabled={!hasImage}
+            />
+            <span className="font-medium text-slate-600 dark:text-slate-300">
+              Use image (counts toward limit)
+            </span>
+          </label>
+
+          <label
+            className={cn(
+              "inline-flex items-center gap-2 rounded-lg border px-3 py-2 transition",
+              hasDescription
+                ? "cursor-pointer border-slate-300 bg-white hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-900 dark:hover:bg-slate-800"
+                : "cursor-not-allowed border-slate-200 bg-slate-100 opacity-60 dark:border-slate-700 dark:bg-slate-800"
+            )}
+          >
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              checked={selection.useText && hasDescription}
+              onChange={(event) =>
+                handleContextTextToggle(type, event.target.checked)
+              }
+              disabled={!hasDescription}
+            />
+            <span className="font-medium text-slate-600 dark:text-slate-300">
+              Add description to prompt
+            </span>
+          </label>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300">
+          {hasDescription
+            ? asset.description
+            : "No description yet. Add one in the Girls manager to describe this context."}
+        </div>
+      </div>
     );
   };
 
@@ -387,7 +685,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
       <div className="mb-4">
         <h2 className="break-words text-lg font-semibold sm:text-xl">Job Composer</h2>
         <p className="break-words text-sm text-slate-500 sm:text-sm dark:text-slate-400">
-          Assemble prompt, references, and options. Max three references per job.
+          Assemble prompt, references, and options. Max {MAX_REFERENCES} references per job.
         </p>
       </div>
 
@@ -472,15 +770,60 @@ Match lighting and shadows so the subject looks naturally placed.`,
           </section>
         )}
 
-        <div className="grid min-w-0 gap-3">
+        <div className="grid min-w-0 gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                References in use
+              </span>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                {totalRefs}/{MAX_REFERENCES} slots • {imageIds.length} library • {contextImageCount} context • {refUrls.length} uploads • {remainingSlots} left
+              </p>
+            </div>
+            {limitReached && (
+              <span className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                All slots filled
+              </span>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Context assets
+              </span>
+              <button
+                type="button"
+                onClick={handleClearContextSelections}
+                disabled={!hasActiveContextSelections}
+                className="rounded-full border border-slate-300 px-4 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Clear context selections
+              </button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {CONTEXT_TYPES.map((type) => renderContextControl(type))}
+            </div>
+            {contextLimitMessage && (
+              <div className="rounded-lg border border-amber-400 bg-amber-50 p-3 text-xs text-amber-700 dark:border-amber-500/60 dark:bg-amber-500/10 dark:text-amber-200">
+                {contextLimitMessage}
+              </div>
+            )}
+          </div>
+
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              Reference library ({imageIds.length}/3)
+              Library references{" "}
+              <span className="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+                {maxManualSlots
+                  ? `${imageIds.length}/${maxManualSlots} slots used`
+                  : `${imageIds.length} selected`}
+              </span>
             </span>
             <div className="flex flex-wrap items-center gap-3 text-xs sm:text-xs">
-              {limitReached && (
+              {manualSlotsRemaining === 0 && maxManualSlots > 0 && (
                 <span className="text-amber-600 dark:text-amber-400">
-                  Max 3 references reached
+                  Manual slots full
                 </span>
               )}
               {loading.library && (
@@ -578,7 +921,12 @@ Match lighting and shadows so the subject looks naturally placed.`,
         <div className="grid min-w-0 gap-2">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-              Temporary images ({refUrls.length}/3)
+              Temporary images{" "}
+              <span className="ml-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+                {maxTemporarySlots
+                  ? `${refUrls.length}/${maxTemporarySlots} slots used`
+                  : `${refUrls.length} selected`}
+              </span>
             </label>
             <div className="break-words text-xs text-slate-500 dark:text-slate-400 sm:text-right">
               Upload from device • Not saved to library
@@ -590,13 +938,15 @@ Match lighting and shadows so the subject looks naturally placed.`,
               <RefUrlPreview
                 key={url}
                 url={url}
-                orderLabel={ordinal(imageIds.length + index)}
+                orderLabel={ordinal(
+                  imageIds.length + contextImageCount + index
+                )}
                 onRemove={() => removeRefUrl(url)}
               />
             ))}
           </div>
 
-          {totalRefs < 3 && (
+          {temporarySlotsRemaining > 0 && (
             <div className="flex items-center gap-3">
               <label className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-4 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 sm:w-auto sm:px-4 sm:py-3 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800">
                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -2,6 +2,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { db, Timestamp } from "@/lib/firebase-admin";
+import {
+  createEmptyContextAssets,
+  normalizeContextAssets,
+} from "@/lib/context";
 
 export async function GET() {
   const snapshot = await db
@@ -15,6 +19,7 @@ export async function GET() {
       id: doc.id,
       ...data,
       createdAt: data.createdAt?.toDate?.().toISOString?.() ?? null,
+      contextAssets: normalizeContextAssets(data.contextAssets),
     };
   });
 
@@ -33,6 +38,7 @@ export async function POST(request) {
     name,
     notes,
     refImageIds,
+    contextAssets: createEmptyContextAssets(),
     createdAt: Timestamp.now(),
   });
 

@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useComposer } from "@/store/useComposer";
 import UploadButton from "@/components/UploadButton";
+import { CONTEXT_TYPES } from "@/lib/constants";
+import {
+  createEmptyContextAssets,
+  normalizeContextAssets,
+  CONTEXT_LABELS,
+} from "@/lib/context";
 
 const cn = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -20,6 +26,8 @@ export default function GirlsGrid() {
     notes: "",
     refImageIds: [],
   });
+  const [contextForm, setContextForm] = useState(createEmptyContextAssets());
+  const [saveError, setSaveError] = useState("");
   const [loading, setLoading] = useState({
     girls: false,
     library: false,
@@ -121,6 +129,10 @@ export default function GirlsGrid() {
     () => girls.find((girl) => girl.id === selectedGirlId),
     [girls, selectedGirlId]
   );
+  const selectedGirlContextAssets = useMemo(
+    () => normalizeContextAssets(selectedGirl?.contextAssets),
+    [selectedGirl]
+  );
 
   const { selectedOwnedCount, selectedSharedCount } = useMemo(() => {
     const ownedIds = new Set(ownedLibrary.map((image) => image.id));
@@ -152,6 +164,60 @@ export default function GirlsGrid() {
         : [],
     });
   }, [selectedGirl]);
+
+  useEffect(() => {
+    if (!selectedGirl) {
+      setContextForm(createEmptyContextAssets());
+      setSaveError("");
+      return;
+    }
+    setContextForm(selectedGirlContextAssets);
+    setSaveError("");
+  }, [selectedGirl, selectedGirlContextAssets]);
+
+  const ownedImageMap = useMemo(() => {
+    const map = new Map();
+    ownedLibrary.forEach((image) => {
+      map.set(image.id, image);
+    });
+    return map;
+  }, [ownedLibrary]);
+
+  const contextDirty = useMemo(() => {
+    if (!selectedGirl) return false;
+    return CONTEXT_TYPES.some((type) => {
+      const draft = contextForm[type] || { imageId: "", description: "" };
+      const baseline = selectedGirlContextAssets[type] || {
+        imageId: "",
+        description: "",
+      };
+      return (
+        draft.imageId !== baseline.imageId ||
+        draft.description !== baseline.description
+      );
+    });
+  }, [contextForm, selectedGirl, selectedGirlContextAssets]);
+
+  const generalDirty = useMemo(() => {
+    if (!selectedGirl) return false;
+    const baseName = selectedGirl.name ?? "";
+    const baseNotes = selectedGirl.notes ?? "";
+    const baseRefs = Array.isArray(selectedGirl.refImageIds)
+      ? selectedGirl.refImageIds.slice(0, 2)
+      : [];
+    const currentRefs = editForm.refImageIds.slice(0, 2);
+    const refsChanged =
+      baseRefs.length !== currentRefs.length ||
+      baseRefs.some((id, index) => id !== currentRefs[index]);
+
+    return (
+      baseName !== (editForm.name ?? "") ||
+      baseNotes !== (editForm.notes ?? "") ||
+      refsChanged
+    );
+  }, [editForm, selectedGirl]);
+
+  const hasChanges = generalDirty || contextDirty;
 
   const handleCreate = async (event) => {
     event.preventDefault();
@@ -190,6 +256,7 @@ export default function GirlsGrid() {
   const handleOwnedUpload = useCallback(
     async (uploaded = []) => {
       if (!selectedGirlId) return;
+      setSaveError("");
       await loadOwnedLibrary(selectedGirlId);
       if (!Array.isArray(uploaded) || uploaded.length === 0) {
         return;
@@ -212,7 +279,90 @@ export default function GirlsGrid() {
     [loadOwnedLibrary, selectedGirlId]
   );
 
+  const handleContextDescriptionChange = useCallback((type, value) => {
+    setSaveError("");
+    setContextForm((prev) => {
+      const current = prev[type] || { imageId: "", description: "" };
+      if (current.description === value) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [type]: {
+          ...current,
+          description: value,
+        },
+      };
+    });
+  }, []);
+
+  const handleContextSelectImage = useCallback((type, value) => {
+    setSaveError("");
+    const nextId =
+      typeof value === "string" && value.trim() ? value.trim() : "";
+    setContextForm((prev) => {
+      const current = prev[type] || { imageId: "", description: "" };
+      if (current.imageId === nextId) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [type]: {
+          ...current,
+          imageId: nextId,
+        },
+      };
+    });
+  }, []);
+
+  const handleClearContextImage = useCallback((type) => {
+    setSaveError("");
+    setContextForm((prev) => {
+      const current = prev[type] || { imageId: "", description: "" };
+      if (!current.imageId) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [type]: {
+          ...current,
+          imageId: "",
+        },
+      };
+    });
+  }, []);
+
+  const handleContextUpload = useCallback(
+    async (type, uploaded = []) => {
+      if (!selectedGirlId) return;
+      if (!Array.isArray(uploaded) || uploaded.length === 0) return;
+      const first = uploaded[0];
+      const imageId =
+        first && typeof first === "object" && typeof first.imageId === "string"
+          ? first.imageId
+          : "";
+      if (!imageId) return;
+      setSaveError("");
+      setContextForm((prev) => {
+        const current = prev[type] || { imageId: "", description: "" };
+        if (current.imageId === imageId) {
+          return prev;
+        }
+        return {
+          ...prev,
+          [type]: {
+            ...current,
+            imageId,
+          },
+        };
+      });
+      await loadOwnedLibrary(selectedGirlId);
+    },
+    [loadOwnedLibrary, selectedGirlId]
+  );
+
   const toggleRefImage = (id) => {
+    setSaveError("");
     setEditForm((prev) => {
       const exists = prev.refImageIds.includes(id);
       if (exists) {
@@ -268,20 +418,181 @@ export default function GirlsGrid() {
     );
   };
 
+  const renderContextCard = (type) => {
+    const asset = contextForm[type] || { imageId: "", description: "" };
+    const baseline = selectedGirlContextAssets[type] || {
+      imageId: "",
+      description: "",
+    };
+    const imageMeta = ownedImageMap.get(asset.imageId);
+    const isDirty =
+      asset.imageId !== baseline.imageId ||
+      asset.description !== baseline.description;
+
+    return (
+      <div
+        key={type}
+        className={cn(
+          "space-y-3 rounded-xl border p-4 shadow-sm transition",
+          isDirty
+            ? "border-indigo-400 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10"
+            : "border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        )}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {CONTEXT_LABELS[type]}
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Keep her {type} consistent across generations.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {asset.imageId && (
+              <button
+                type="button"
+                onClick={() => handleClearContextImage(type)}
+                className="rounded-full border border-slate-300 px-3 py-1 text-[11px] font-semibold text-slate-600 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
+              >
+                Clear
+              </button>
+            )}
+            <UploadButton
+              ownerGirlId={selectedGirl?.id || ""}
+              contextType={type}
+              multiple={false}
+              onUploaded={(files) => handleContextUpload(type, files)}
+              label="Upload image"
+              uploadingLabel="Uploading…"
+            />
+          </div>
+        </div>
+        <div className="overflow-hidden rounded-lg border border-dashed border-slate-300 bg-slate-50 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
+          {imageMeta ? (
+            <Image
+              src={imageMeta.publicUrl}
+              alt={`${CONTEXT_LABELS[type]} reference`}
+              width={320}
+              height={320}
+              className="h-40 w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-40 items-center justify-center px-3 text-center">
+              {asset.imageId
+                ? "Image missing from library. Clear or select a different one."
+                : "No image selected yet."}
+            </div>
+          )}
+        </div>
+        <label className="grid gap-1 text-xs">
+          <span className="font-semibold text-slate-600 dark:text-slate-300">
+            Use existing image
+          </span>
+          <select
+            value={asset.imageId}
+            onChange={(event) =>
+              handleContextSelectImage(type, event.target.value)
+            }
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
+          >
+            <option value="">No image</option>
+            {ownedLibrary.map((image) => (
+              <option key={image.id} value={image.id}>
+                {image.filename || image.id}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs">
+          <span className="font-semibold text-slate-600 dark:text-slate-300">
+            Prompt description
+          </span>
+          <textarea
+            rows={2}
+            value={asset.description}
+            onChange={(event) =>
+              handleContextDescriptionChange(type, event.target.value)
+            }
+            placeholder={`Describe her ${CONTEXT_LABELS[
+              type
+            ].toLowerCase()}`}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
+          />
+        </label>
+        {isDirty && (
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+            Unsaved edits
+          </p>
+        )}
+      </div>
+    );
+  };
+
   const handleSave = async () => {
-    if (!selectedGirl) return;
+    if (!selectedGirl || !hasChanges) return;
+    setSaveError("");
     setLoading((prev) => ({ ...prev, save: true }));
     try {
-      await fetch(`/api/girls/${selectedGirl.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: editForm.name,
-          notes: editForm.notes,
-          refImageIds: editForm.refImageIds.slice(0, 2),
-        }),
+      if (generalDirty) {
+        const res = await fetch(`/api/girls/${selectedGirl.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: editForm.name,
+            notes: editForm.notes,
+            refImageIds: editForm.refImageIds.slice(0, 2),
+          }),
+        });
+        if (!res.ok) {
+          const message = await res.text();
+          throw new Error(message || "Failed to update girl profile");
+        }
+      }
+
+      const contextUpdates = [];
+      CONTEXT_TYPES.forEach((type) => {
+        const draft = contextForm[type] || { imageId: "", description: "" };
+        const baseline = selectedGirlContextAssets[type] || {
+          imageId: "",
+          description: "",
+        };
+        if (
+          draft.imageId !== baseline.imageId ||
+          draft.description !== baseline.description
+        ) {
+          contextUpdates.push({
+            type,
+            imageId: draft.imageId || null,
+            description: draft.description ? draft.description.trim() : "",
+          });
+        }
       });
+
+      for (const update of contextUpdates) {
+        const res = await fetch(
+          `/api/girls/${selectedGirl.id}/context-assets`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(update),
+          }
+        );
+        if (!res.ok) {
+          const message = await res.text();
+          throw new Error(
+            message || `Failed to update ${CONTEXT_LABELS[update.type]}`
+          );
+        }
+      }
+
       await refreshGirls();
+      if (selectedGirlId) {
+        await loadOwnedLibrary(selectedGirlId);
+      }
+      setSaveError("");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error));
     } finally {
       setLoading((prev) => ({ ...prev, save: false }));
     }
@@ -422,12 +733,13 @@ export default function GirlsGrid() {
                 <input
                   type="text"
                   value={editForm.name}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    setSaveError("");
                     setEditForm((prev) => ({
                       ...prev,
                       name: event.target.value,
-                    }))
-                  }
+                    }));
+                  }}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
                 />
               </label>
@@ -438,12 +750,13 @@ export default function GirlsGrid() {
                 <textarea
                   rows={4}
                   value={editForm.notes}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    setSaveError("");
                     setEditForm((prev) => ({
                       ...prev,
                       notes: event.target.value,
-                    }))
-                  }
+                    }));
+                  }}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
                 />
               </label>
@@ -519,16 +832,44 @@ export default function GirlsGrid() {
                   </div>
                 )}
               </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Context assets
+                    </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Attach room and phone references so we can keep her scenes consistent.
+                    </p>
+                  </div>
+                  {contextDirty && (
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-600 dark:text-indigo-300">
+                      Unsaved changes
+                    </span>
+                  )}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {CONTEXT_TYPES.map((type) => renderContextCard(type))}
+                </div>
+              </div>
             </section>
 
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-col items-end gap-2">
+              {saveError && (
+                <p className="text-xs text-rose-500">{saveError}</p>
+              )}
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={loading.save}
+                disabled={loading.save || !hasChanges}
                 className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-slate-200"
               >
-                {loading.save ? "Saving…" : "Save changes"}
+                {loading.save
+                  ? "Saving…"
+                  : hasChanges
+                  ? "Save changes"
+                  : "Up to date"}
               </button>
             </div>
           </div>
