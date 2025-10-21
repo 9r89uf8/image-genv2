@@ -44,6 +44,7 @@ export default function JobQueueList() {
   const [selectedGirlId, setSelectedGirlId] = useState("");
   const [girlsError, setGirlsError] = useState("");
   const [isGirlsLoading, setIsGirlsLoading] = useState(false);
+  const [copiedJobId, setCopiedJobId] = useState(null);
 
   useEffect(() => {
     startPolling();
@@ -128,6 +129,40 @@ export default function JobQueueList() {
   }, [jobs, selectedGirlId]);
 
   const hasFilterApplied = Boolean(selectedGirlId);
+
+  const handleDownload = async (url, jobId) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to fetch image');
+      }
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = `image-${jobId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback: open in new tab
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleCopyPrompt = async (prompt, jobId) => {
+    try {
+      await navigator.clipboard.writeText(prompt);
+      setCopiedJobId(jobId);
+      setTimeout(() => setCopiedJobId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy prompt:', error);
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
@@ -232,9 +267,20 @@ export default function JobQueueList() {
 
                 <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_160px]">
                   <div className="space-y-2 text-sm">
-                    <p className="whitespace-pre-line text-slate-700 dark:text-slate-200">
-                      {job.prompt || "—"}
-                    </p>
+                    <div className="flex items-start gap-2">
+                      <p className="flex-1 whitespace-pre-line text-slate-700 dark:text-slate-200">
+                        {job.prompt || "—"}
+                      </p>
+                      {job.prompt && (
+                        <button
+                          type="button"
+                          onClick={() => handleCopyPrompt(job.prompt, job.id)}
+                          className="shrink-0 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                        >
+                          {copiedJobId === job.id ? "Copied!" : "Copy"}
+                        </button>
+                      )}
+                    </div>
                     <div className="grid gap-1 text-xs text-slate-500 dark:text-slate-400 md:grid-cols-2">
                       <span>
                         Finished: {job.finishedAt ? formatDate(job.finishedAt) : "—"}
@@ -305,13 +351,13 @@ export default function JobQueueList() {
                       </button>
                     )}
                     {job.result?.publicUrl && (
-                      <a
-                        href={job.result.publicUrl}
-                        download
+                      <button
+                        type="button"
+                        onClick={() => handleDownload(job.result.publicUrl, job.id)}
                         className="rounded-full border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
                       >
                         Download
-                      </a>
+                      </button>
                     )}
                     {canRerun && (
                       <button
