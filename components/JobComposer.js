@@ -308,6 +308,35 @@ export default function JobComposer() {
     [composerContextAssets, ownedImageMap]
   );
 
+  const contextImageIdsSet = useMemo(() => {
+    const set = new Set();
+    CONTEXT_TYPES.forEach((typeKey) => {
+      const asset = composerContextAssets[typeKey];
+      if (asset?.imageId) {
+        set.add(asset.imageId);
+      }
+    });
+    return set;
+  }, [composerContextAssets]);
+
+  const ownedSubjectLibrary = useMemo(
+    () =>
+      ownedLibrary.filter((image) => {
+        if (!image) return false;
+        if (contextImageIdsSet.has(image.id)) return false;
+        const contextType = typeof image.contextType === "string" ? image.contextType.toLowerCase() : "";
+        if (contextType && CONTEXT_TYPES.includes(contextType)) {
+          return false;
+        }
+        const category = typeof image.category === "string" ? image.category.toLowerCase() : "";
+        if (category === "context") {
+          return false;
+        }
+        return true;
+      }),
+    [ownedLibrary, contextImageIdsSet]
+  );
+
   const contextImageOrderMap = useMemo(() => {
     let position = imageIds.length;
     const order = {};
@@ -841,7 +870,7 @@ Match lighting and shadows so the subject looks naturally placed.`,
                 <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                   Girl-specific references
                 </span>
-                {ownedLibrary.length > 0 && (
+                {ownedSubjectLibrary.length > 0 && (
                   <button
                     type="button"
                     onClick={() =>
@@ -861,13 +890,13 @@ Match lighting and shadows so the subject looks naturally placed.`,
                 <div className="rounded-lg border border-red-400 bg-red-50 p-3 text-sm text-red-700 sm:text-xs dark:border-red-500/60 dark:bg-red-500/10 dark:text-red-200">
                   {errors.ownedLibrary}
                 </div>
-              ) : ownedLibrary.length === 0 ? (
+              ) : ownedSubjectLibrary.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 sm:text-xs dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-400">
                   No private references yet. Upload them from the Girls page.
                 </div>
               ) : showOwnedLibrary ? (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {ownedLibrary.map((image) =>
+                  {ownedSubjectLibrary.map((image) =>
                     renderReferenceButton(image, "owned")
                   )}
                 </div>
