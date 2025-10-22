@@ -682,7 +682,7 @@ export default function JobComposer() {
   const applyTemplate = (kind) => {
     const templates = {
       bikini: `generate an image of the same girl using first and second image in her room, using third image. she is taking a mirror selfie. change the outfit and pose. use the fourth image as her phone. Keep her identity, face, body proportions unchanged.
-photo of an adult woman (21+) wearing a simple two-piece bikini in her bedroom during daylight. relaxed pose, gentle smile. 50mm, f/2.8, realistic proportions, editorial quality. No nudity, no sheer fabrics, non-sexualized framing.`,
+photo of an adult woman (21+) wearing a simple two-piece bikini in her bedroom during daylight. relaxed pose, gentle smile. 50mm, f/2.8, editorial quality. No nudity, no sheer fabrics, non-sexualized framing.`,
       girl: `generate an image of the same girl using first and second image in her room, using third image. she is taking a mirror selfie. change the outfit and pose. use the fourth image as her phone. Keep her identity, face, body proportions unchanged.`,
     };
     const value = templates[kind];
