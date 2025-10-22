@@ -681,13 +681,9 @@ export default function JobComposer() {
 
   const applyTemplate = (kind) => {
     const templates = {
-      leggings: `Replace the leggings from the first image with the leggings from the second image.
-Keep the person's face, body proportions, pose, and background exactly the same.
-Match the fabric folds and lighting so it looks natural.`,
-      object: `Add the object from the second image to the person in the first image.
-Place it naturally. Keep face, hair, pose, outfit, and background unchanged.`,
-      background: `Keep the person from the first image but replace the background with the background from the second image.
-Match lighting and shadows so the subject looks naturally placed.`,
+      bikini: `generate an image of the same girl using first and second image in her room, using third image. she is taking a mirror selfie. change the outfit and pose. use the fourth image as her phone. Keep her identity, face, body proportions unchanged.
+photo of an adult woman (21+) wearing a simple two-piece bikini in her bedroom during daylight. relaxed pose, gentle smile. 50mm, f/2.8, realistic proportions, editorial quality. No nudity, no sheer fabrics, non-sexualized framing.`,
+      girl: `generate an image of the same girl using first and second image in her room, using third image. she is taking a mirror selfie. change the outfit and pose. use the fourth image as her phone. Keep her identity, face, body proportions unchanged.`,
     };
     const value = templates[kind];
     if (value) {
@@ -1008,24 +1004,17 @@ Match lighting and shadows so the subject looks naturally placed.`,
             </span>
             <button
               type="button"
-              onClick={() => applyTemplate("leggings")}
+              onClick={() => applyTemplate("bikini")}
               className="w-full rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
             >
-              Replace leggings
+              Bikini Pic
             </button>
             <button
               type="button"
-              onClick={() => applyTemplate("object")}
+              onClick={() => applyTemplate("girl")}
               className="w-full rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
             >
-              Add object
-            </button>
-            <button
-              type="button"
-              onClick={() => applyTemplate("background")}
-              className="w-full rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 sm:w-auto sm:px-3 sm:py-1 sm:text-xs dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-700"
-            >
-              Replace background
+              Same Girl Pic
             </button>
           </div>
 
