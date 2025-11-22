@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { DEFAULT_ASPECT_RATIO } from "@/lib/constants";
+import { DEFAULT_ASPECT_RATIO, DEFAULT_IMAGE_SIZE } from "@/lib/constants";
 
 export default function ChatPane({ sessionId, onRefreshSessions }) {
   const [session, setSession] = useState(null);
@@ -34,6 +34,7 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
       const sanitizedSession = data.session
         ? {
             ...data.session,
+            imageSize: data.session.imageSize || DEFAULT_IMAGE_SIZE,
             totalCostUsd: Number(data.session.totalCostUsd ?? 0),
             totalTokens: Number(data.session.totalTokens ?? 0),
             totalImages: Number(data.session.totalImages ?? 0),
@@ -122,6 +123,7 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
           refUrls: attachments,
           imageOnly: false,
           aspectRatio: session?.aspectRatio || DEFAULT_ASPECT_RATIO,
+          imageSize: session?.imageSize || DEFAULT_IMAGE_SIZE,
         }),
       });
       if (!res.ok) {
@@ -184,6 +186,7 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
     scrollToBottom,
     sending,
     session?.aspectRatio,
+    session?.imageSize,
     sessionId,
   ]);
 
@@ -195,7 +198,8 @@ export default function ChatPane({ sessionId, onRefreshSessions }) {
             {session?.title || "Chat"}
           </h2>
           <p className="truncate text-sm text-slate-500 sm:text-xs">
-            Aspect ratio: {session?.aspectRatio || DEFAULT_ASPECT_RATIO}
+            Aspect ratio: {session?.aspectRatio || DEFAULT_ASPECT_RATIO} · Size:{" "}
+            {session?.imageSize || DEFAULT_IMAGE_SIZE}
           </p>
           <p className="truncate text-sm text-slate-500 sm:text-xs">
             Total cost: $

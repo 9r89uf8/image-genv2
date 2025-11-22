@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ChatPane from "@/components/ChatPane";
-import { DEFAULT_ASPECT_RATIO } from "@/lib/constants";
+import { DEFAULT_ASPECT_RATIO, DEFAULT_IMAGE_SIZE } from "@/lib/constants";
 
 export default function ChatPageClient() {
   const [sessions, setSessions] = useState([]);
@@ -29,6 +29,7 @@ export default function ChatPageClient() {
       const sanitized =
         data.sessions?.map((session) => ({
           ...session,
+          imageSize: session.imageSize || DEFAULT_IMAGE_SIZE,
           totalCostUsd: Number(session.totalCostUsd ?? 0),
           totalTokens: Number(session.totalTokens ?? 0),
           totalImages: Number(session.totalImages ?? 0),
@@ -201,6 +202,7 @@ export default function ChatPageClient() {
         body: JSON.stringify({
           title: "New chat",
           aspectRatio: DEFAULT_ASPECT_RATIO,
+          imageSize: DEFAULT_IMAGE_SIZE,
           girlId: selectedGirlId || "",
         }),
       });
@@ -323,7 +325,7 @@ export default function ChatPageClient() {
                     </div>
                   )}
                   <div className="truncate text-sm text-slate-500 sm:text-xs">
-                    {session.aspectRatio} ·{" "}
+                    {session.aspectRatio} · {session.imageSize} ·{" "}
                     {session.lastActive
                       ? new Date(session.lastActive).toLocaleString()
                       : "no activity"}

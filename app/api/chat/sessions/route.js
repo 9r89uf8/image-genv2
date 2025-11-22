@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { db, Timestamp } from "@/lib/firebase-admin";
-import { DEFAULT_ASPECT_RATIO } from "@/lib/constants";
+import { DEFAULT_ASPECT_RATIO, DEFAULT_IMAGE_SIZE } from "@/lib/constants";
 
 function serializeTimestamp(ts) {
   return ts?.toDate?.()?.toISOString?.() ?? null;
@@ -22,6 +22,7 @@ export async function GET() {
       title: data.title || "Untitled",
       girlId: data.girlId || "",
       aspectRatio: data.aspectRatio || DEFAULT_ASPECT_RATIO,
+      imageSize: data.imageSize || DEFAULT_IMAGE_SIZE,
       systemPrompt: data.systemPrompt || "",
       totalCostUsd: Number(data.totalCostUsd ?? 0),
       totalTokens: Number(data.totalTokens ?? 0),
@@ -40,6 +41,7 @@ export async function POST(request) {
     title = "New chat",
     girlId = "",
     aspectRatio = DEFAULT_ASPECT_RATIO,
+    imageSize = DEFAULT_IMAGE_SIZE,
     systemPrompt = "",
   } = body;
 
@@ -50,6 +52,7 @@ export async function POST(request) {
     title,
     girlId,
     aspectRatio,
+    imageSize,
     systemPrompt,
     createdAt: now,
     lastActive: now,

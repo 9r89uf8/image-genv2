@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import {
   DEFAULT_ASPECT_RATIO,
+  DEFAULT_IMAGE_SIZE,
   MAX_REFERENCES,
   CONTEXT_TYPES,
 } from "@/lib/constants";
@@ -35,6 +36,7 @@ const createDefaultState = () => ({
   refUrls: [],
   prompt: "",
   aspectRatio: DEFAULT_ASPECT_RATIO,
+  imageSize: DEFAULT_IMAGE_SIZE,
   imageOnly: false,
   chatMode: false,
   isSubmitting: false,
@@ -205,6 +207,7 @@ export const useComposer = create((set, get) => ({
     base.girlId = job?.girlId || "";
     base.refUrls = firstUrl ? [firstUrl] : [];
     base.aspectRatio = job?.inputs?.aspectRatio || DEFAULT_ASPECT_RATIO;
+    base.imageSize = job?.inputs?.imageSize || DEFAULT_IMAGE_SIZE;
     base.editingFromJob = job?.id || "prefilled";
     set(base);
   },
@@ -232,6 +235,7 @@ export const useComposer = create((set, get) => ({
         contextImageIds,
         refUrls: state.refUrls,
         aspectRatio: state.aspectRatio,
+        imageSize: state.imageSize,
         imageOnly: state.imageOnly,
         chatMode: state.chatMode,
         contextSelections: state.contextSelections,
@@ -248,6 +252,7 @@ export const useComposer = create((set, get) => ({
             title: "Composer chat",
             girlId: state.girlId || "",
             aspectRatio: state.aspectRatio,
+            imageSize: state.imageSize,
           }),
         });
         if (!res1.ok) {
@@ -264,6 +269,7 @@ export const useComposer = create((set, get) => ({
             refUrls: state.refUrls,
             imageOnly: state.imageOnly,
             aspectRatio: state.aspectRatio,
+            imageSize: state.imageSize,
             contextSelections: state.contextSelections,
             contextImageIds,
           }),

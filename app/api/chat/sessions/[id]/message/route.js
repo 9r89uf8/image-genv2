@@ -13,6 +13,7 @@ import {
 } from "@/lib/chat";
 import {
   DEFAULT_ASPECT_RATIO,
+  DEFAULT_IMAGE_SIZE,
   FILE_URI_TTL_MS,
   TOKENS_PER_IMAGE,
 } from "@/lib/constants";
@@ -33,6 +34,7 @@ export async function POST(request, context) {
     refUrls = [],
     imageOnly = false,
     aspectRatio,
+    imageSize,
   } = body;
 
   if (
@@ -56,6 +58,7 @@ export async function POST(request, context) {
   const session = sessionSnap.data() || {};
   const aspect =
     aspectRatio || session.aspectRatio || DEFAULT_ASPECT_RATIO;
+  const size = imageSize || session.imageSize || DEFAULT_IMAGE_SIZE;
 
   const existingTurnsSnap = await sessionRef
     .collection("turns")
@@ -124,14 +127,14 @@ export async function POST(request, context) {
 
   let response;
   try {
-    const chat = createChat({ history, aspectRatio: aspect });
+    const chat = createChat({ history, aspectRatio: aspect, imageSize: size });
     response = await chat.sendMessage({
       message: messageParts,
       config: {
         responseModalities: imageOnly
           ? [Modality.IMAGE]
           : [Modality.TEXT, Modality.IMAGE],
-        imageConfig: { aspectRatio: aspect },
+        imageConfig: { aspectRatio: aspect, imageSize: size },
       },
     });
   } catch (error) {
@@ -229,6 +232,7 @@ export async function POST(request, context) {
   await sessionRef.update({
     lastActive: Timestamp.now(),
     aspectRatio: aspect,
+    imageSize: size,
     totalCostUsd: FieldValue.increment(costIncrement),
     totalTokens: FieldValue.increment(tokenIncrement),
     totalImages: FieldValue.increment(imageIncrement),

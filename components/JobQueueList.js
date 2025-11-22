@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useComposer } from "@/store/useComposer";
 import { useQueueView } from "@/store/useQueueView";
+import { DEFAULT_IMAGE_SIZE } from "@/lib/constants";
 
 const statusStyles = {
   PENDING: "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300",
@@ -325,7 +326,8 @@ export default function JobQueueList() {
 
                 <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900/60">
                   <span className="text-xs text-slate-500 dark:text-slate-400">
-                    Aspect ratio: {job.inputs?.aspectRatio ?? "—"} · Image-only:{" "}
+                    Aspect ratio: {job.inputs?.aspectRatio ?? "—"} · Size:{" "}
+                    {job.inputs?.imageSize || DEFAULT_IMAGE_SIZE} · Image-only:{" "}
                     {job.inputs?.imageOnly ? "Yes" : "No"}
                   </span>
                   <div className="flex flex-wrap items-center gap-2">

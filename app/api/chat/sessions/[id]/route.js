@@ -2,7 +2,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { db } from "@/lib/firebase-admin";
-import { DEFAULT_ASPECT_RATIO } from "@/lib/constants";
+import { DEFAULT_ASPECT_RATIO, DEFAULT_IMAGE_SIZE } from "@/lib/constants";
 
 function serializeTimestamp(ts) {
   return ts?.toDate?.()?.toISOString?.() ?? null;
@@ -91,6 +91,7 @@ export async function GET(_request, context) {
       title: session.title || "Untitled",
       girlId: session.girlId || "",
       aspectRatio: session.aspectRatio || DEFAULT_ASPECT_RATIO,
+      imageSize: session.imageSize || DEFAULT_IMAGE_SIZE,
       systemPrompt: session.systemPrompt || "",
       createdAt: serializeTimestamp(session.createdAt),
       lastActive: serializeTimestamp(session.lastActive),

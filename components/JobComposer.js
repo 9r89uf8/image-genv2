@@ -2,7 +2,12 @@
 //components/JobComposer.js
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { ASPECT_RATIOS, MAX_REFERENCES, CONTEXT_TYPES } from "@/lib/constants";
+import {
+  ASPECT_RATIOS,
+  IMAGE_SIZES,
+  MAX_REFERENCES,
+  CONTEXT_TYPES,
+} from "@/lib/constants";
 import { useComposer } from "@/store/useComposer";
 import { useQueueView } from "@/store/useQueueView";
 import {
@@ -105,6 +110,7 @@ export default function JobComposer() {
   const removeRefUrl = useComposer((state) => state.removeRefUrl);
   const prompt = useComposer((state) => state.prompt);
   const aspectRatio = useComposer((state) => state.aspectRatio);
+  const imageSize = useComposer((state) => state.imageSize);
   const imageOnly = useComposer((state) => state.imageOnly);
   const chatMode = useComposer((state) => state.chatMode);
   const isSubmitting = useComposer((state) => state.isSubmitting);
@@ -715,7 +721,7 @@ photo of an adult woman (21+) wearing a simple two-piece bikini in her bedroom d
       </div>
 
       <div className="grid min-w-0 gap-4 sm:gap-6">
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+        <div className="grid min-w-0 gap-3 md:grid-cols-3">
           <label className="flex flex-col gap-2 text-sm">
             <span className="font-medium text-slate-700 dark:text-slate-200">
               Girl
@@ -753,6 +759,23 @@ photo of an adult woman (21+) wearing a simple two-piece bikini in her bedroom d
               {ASPECT_RATIOS.map((ratio) => (
                 <option key={ratio} value={ratio}>
                   {ratio}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm">
+            <span className="font-medium text-slate-700 dark:text-slate-200">
+              Output size
+            </span>
+            <select
+              value={imageSize}
+              onChange={(event) => setField("imageSize", event.target.value)}
+              className="w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 sm:py-2 sm:text-sm dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:ring-slate-600"
+            >
+              {IMAGE_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size}
                 </option>
               ))}
             </select>
